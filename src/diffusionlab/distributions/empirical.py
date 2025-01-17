@@ -1,4 +1,4 @@
-from typing import Any, Dict, Literal, Tuple
+from typing import Any, Dict, Tuple
 import torch
 from torch.utils.data import DataLoader
 
@@ -8,6 +8,15 @@ from diffusionlab.utils import pad_shape_back
 
 
 class EmpiricalDistribution(Distribution):
+    """
+    An empirical distribution, i.e., the uniform distribution over a dataset.
+    Formally, the distribution is defined as:
+
+    mu(B) = (1/N) * sum_(i=1)^(N) delta(x_i in B)
+
+    where x_i is the ith data point in the dataset, and N is the number of data points.
+    """
+
     def __init__(self, sampler: Sampler, labeled_data: DataLoader):
         super().__init__(sampler, {"data": labeled_data})
         self.labeled_data = labeled_data
@@ -24,20 +33,20 @@ class EmpiricalDistribution(Distribution):
         cls,
         sampler: Sampler,
         dist_params: Dict[str, Any],
-        x: torch.Tensor,
+        xt: torch.Tensor,
         t: torch.Tensor,
     ) -> torch.Tensor:
         data = dist_params["data"]
 
-        x_flattened = torch.flatten(x, start_dim=1, end_dim=-1)  # (N, *D)
+        x_flattened = torch.flatten(xt, start_dim=1, end_dim=-1)  # (N, *D)
 
         alpha = sampler.alpha(t)  # (N, )
         sigma = sampler.sigma(t)  # (N, )
 
         softmax_denom = torch.zeros_like(t)  # (N, )
-        x0_hat = torch.zeros_like(x)  # (N, *D)
+        x0_hat = torch.zeros_like(xt)  # (N, *D)
         for X_batch, y_batch in data:
-            X_batch = X_batch.to(x.device, non_blocking=True)  # (B, *D)
+            X_batch = X_batch.to(xt.device, non_blocking=True)  # (B, *D)
             X_batch_flattened = torch.flatten(X_batch, start_dim=1, end_dim=-1)[
                 None, ...
             ]  # (1, B, D*)

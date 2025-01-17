@@ -7,6 +7,16 @@ from diffusionlab.utils import vector_lstsq, logdet_pd, sqrt_psd
 
 
 class GMMDistribution(Distribution):
+    """
+    A Gaussian Mixture Model (GMM) with K components.
+    Formally, the distribution is defined as:
+
+    mu(B) = sum_(i=1)^(K) pi_i * N(mu_i, Sigma_i)(B)
+
+    where mu_i is the mean of the ith component, Sigma_i is the covariance matrix of the ith component,
+    and pi_i is the prior probability of the ith component.
+    """
+
     def __init__(
         self,
         sampler: Sampler,
@@ -50,7 +60,7 @@ class GMMDistribution(Distribution):
         cls,
         sampler: Sampler,
         dist_params: Dict[str, Any],
-        x: torch.Tensor,
+        xt: torch.Tensor,
         t: torch.Tensor,
     ) -> torch.Tensor:
         means = dist_params["means"]  # (K, D)
@@ -58,18 +68,18 @@ class GMMDistribution(Distribution):
         priors = dist_params["priors"]  # (K, )
 
         K, D = means.shape
-        N = x.shape[0]
+        N = xt.shape[0]
 
         alpha = sampler.alpha(t)  # (N, )
         sigma = sampler.sigma(t)  # (N, )
 
         covs_t = (alpha[:, None, None, None] ** 2) * covs[None, :, :, :] + (
             sigma[:, None, None, None] ** 2
-        ) * torch.eye(D, device=x.device)[
+        ) * torch.eye(D, device=xt.device)[
             None, None, :, :
         ]  # (N, K, D, D)
         centered_x = (
-            x[:, None, :] - alpha[:, None, None] * means[None, :, :]
+            xt[:, None, :] - alpha[:, None, None] * means[None, :, :]
         )  # (N, K, D)
         covs_t_inv_centered_x = vector_lstsq(covs_t, centered_x)  # (N, K, D)
 
@@ -88,7 +98,7 @@ class GMMDistribution(Distribution):
             softmax_w[:, :, None] * covs_t_inv_centered_x, dim=-2
         )  # (N, D)
         x0_hat = (1 / alpha[:, None]) * (
-            x - (sigma[:, None] ** 2) * weighted_normalized_x
+            xt - (sigma[:, None] ** 2) * weighted_normalized_x
         )  # (N, D)
 
         return x0_hat
@@ -111,6 +121,16 @@ class GMMDistribution(Distribution):
 
 
 class IsoHomoGMMDistribution(Distribution):
+    """
+    An isotropic homoscedastic (i.e., equal spherical variances) Gaussian Mixture Model (GMM) with K components.
+    Formally, the distribution is defined as:
+
+    mu(B) = sum_(i=1)^(K) pi_i * N(mu_i, tau^2 * I_D)(B)
+
+    where mu_i is the mean of the ith component, tau is the standard deviation of the spherical variances,
+    and pi_i is the prior probability of the ith component.
+    """
+
     def __init__(
         self,
         sampler: Sampler,
@@ -148,7 +168,7 @@ class IsoHomoGMMDistribution(Distribution):
         cls,
         sampler: Sampler,
         dist_params: Dict[str, Any],
-        x: torch.Tensor,
+        xt: torch.Tensor,
         t: torch.Tensor,
     ) -> torch.Tensor:
         means = dist_params["means"]  # (K, D)
@@ -156,14 +176,14 @@ class IsoHomoGMMDistribution(Distribution):
         priors = dist_params["priors"]  # (K, )
 
         K, D = means.shape
-        N = x.shape[0]
+        N = xt.shape[0]
 
         alpha = sampler.alpha(t)  # (N, )
         sigma = sampler.sigma(t)  # (N, )
 
         var_t = (alpha**2) * var[None] + (sigma**2)  # (N, )
         centered_x = (
-            x[:, None, :] - alpha[:, None, None] * means[None, :, :]
+            xt[:, None, :] - alpha[:, None, None] * means[None, :, :]
         )  # (N, K, D)
         vars_t_inv_centered_x = centered_x / var_t[:, None, None]  # (N, K, D)
 
@@ -177,7 +197,7 @@ class IsoHomoGMMDistribution(Distribution):
             softmax_w[:, :, None] * vars_t_inv_centered_x, dim=-2
         )  # (N, D)
         x0_hat = (1 / alpha[:, None]) * (
-            x - (sigma[:, None] ** 2) * weighted_normalized_x
+            xt - (sigma[:, None] ** 2) * weighted_normalized_x
         )  # (N, D)
 
         return x0_hat
