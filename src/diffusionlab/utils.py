@@ -6,7 +6,9 @@ from math import prod
 from typing import Callable, cast
 
 
-def scalar_derivative(f: Callable[[torch.Tensor], torch.Tensor]) -> Callable[[torch.Tensor], torch.Tensor]:
+def scalar_derivative(
+    f: Callable[[torch.Tensor], torch.Tensor]
+) -> Callable[[torch.Tensor], torch.Tensor]:
     """
     Computes the scalar derivative of a function f: R -> R.
     Returns a function f_prime: R -> R that computes the derivative of f at a given point,
@@ -25,7 +27,7 @@ def scalar_derivative(f: Callable[[torch.Tensor], torch.Tensor]) -> Callable[[to
         if len(dfx.shape) > 1:
             x_size = prod(x.shape)
             dfx = dfx.reshape(x_size, x_size)
-            dfx= dfx.diagonal(dim1=0, dim2=1)
+            dfx = dfx.diagonal(dim1=0, dim2=1)
             dfx = dfx.reshape(x.shape)
         return dfx
 
@@ -75,10 +77,12 @@ def pad_shape_back(x: torch.Tensor, target_shape: torch.Size) -> torch.Tensor:
 def vector_lstsq(A: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     return torch.linalg.lstsq(A, y[..., None]).solution[..., 0]
 
+
 def logdet_pd(A: torch.Tensor) -> torch.Tensor:
     L = torch.linalg.cholesky(A)
     eigvals = torch.diagonal(L, dim1=-2, dim2=-1)
     return 2 * torch.sum(torch.log(eigvals), dim=-1)
+
 
 def sqrt_psd(A: torch.Tensor) -> torch.Tensor:
     L, Q = torch.linalg.eigh(A)
