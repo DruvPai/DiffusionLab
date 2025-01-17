@@ -95,7 +95,6 @@ dependencies = [
     { name = "lightning" },
     { name = "pytest" },
     { name = "torch" },
-    { name = "torchmetrics" },
 ]
 
 [package.metadata]
@@ -103,7 +102,6 @@ requires-dist = [
     { name = "lightning", specifier = ">=2.5.0.post0" },
     { name = "pytest", specifier = ">=8.3.4" },
     { name = "torch", specifier = ">=2.5.1" },
-    { name = "torchmetrics", specifier = ">=1.6.1" },
 ]
 
 [[package]]
