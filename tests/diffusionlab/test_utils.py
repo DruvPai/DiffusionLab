@@ -11,78 +11,85 @@ from diffusionlab.utils import (
 
 # ===== Derivative Tests =====
 
+
 def test_scalar_derivative_polynomial():
     # Test polynomial function
     def f(x):
-        return x**2 + 2*x + 1
-    
+        return x**2 + 2 * x + 1
+
     f_prime = scalar_derivative(f)
-    
+
     x = torch.tensor(2.0)
     assert torch.allclose(f_prime(x), torch.tensor(6.0))  # d/dx(x^2 + 2x + 1) = 2x + 2
-    
+
     x = torch.tensor(0.0)
     assert torch.allclose(f_prime(x), torch.tensor(2.0))
-    
+
     x = torch.tensor(-1.0)
     assert torch.allclose(f_prime(x), torch.tensor(0.0))
+
 
 def test_scalar_derivative_exponential():
     def f(x):
         return torch.exp(x)
-    
+
     f_prime = scalar_derivative(f)
-    
+
     x = torch.tensor(0.0)
     assert torch.allclose(f_prime(x), torch.tensor(1.0))
-    
+
     x = torch.tensor(1.0)
     assert torch.allclose(f_prime(x), torch.exp(torch.tensor(1.0)))
+
 
 def test_scalar_derivative_trigonometric():
     def f(x):
         return torch.sin(x)
-    
+
     f_prime = scalar_derivative(f)
-    
+
     x = torch.tensor(0.0)
     assert torch.allclose(f_prime(x), torch.tensor(1.0))
-    
-    x = torch.tensor(torch.pi/2)
+
+    x = torch.tensor(torch.pi / 2)
     assert torch.allclose(f_prime(x), torch.tensor(0.0), atol=1e-6)
+
 
 def test_scalar_derivative_broadcasting():
     def f(x):
         return x**2
-    
+
     f_prime = scalar_derivative(f)
-    
+
     x = torch.tensor([1.0, 2.0, 3.0])
     expected = torch.tensor([2.0, 4.0, 6.0])
     assert torch.allclose(f_prime(x), expected)
-    
+
     x = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
     expected = torch.tensor([[2.0, 4.0], [6.0, 8.0]])
     assert torch.allclose(f_prime(x), expected)
-    
+
     x = torch.randn((10, 3, 5, 4, 3))
     expected = 2 * x
     assert torch.allclose(f_prime(x), expected)
 
+
 def test_scalar_derivative_composition():
     def f(x):
         return torch.sin(x**2)
-    
+
     f_prime = scalar_derivative(f)
-    
+
     x = torch.tensor(0.0)
     assert torch.allclose(f_prime(x), torch.tensor(0.0))
-    
+
     x = torch.tensor(1.0)
     expected = 2 * torch.cos(torch.tensor(1.0))
     assert torch.allclose(f_prime(x), expected)
 
+
 # ===== Shape Padding Tests =====
+
 
 def test_pad_shape_front():
     # Test scalar to higher dimensions
@@ -106,6 +113,7 @@ def test_pad_shape_front():
     assert padded.shape == torch.Size([1, 1, 2, 3])
     assert torch.all(padded.squeeze() == x)
 
+
 def test_pad_shape_back():
     # Test scalar to higher dimensions
     x = torch.tensor(5.0)
@@ -128,17 +136,20 @@ def test_pad_shape_back():
     assert padded.shape == torch.Size([2, 3, 1, 1])
     assert torch.all(padded.squeeze() == x)
 
+
 def test_pad_shape_memory_efficiency():
     x = torch.randn(3, 4)
     target_shape = torch.Size([2, 3, 4, 5])
-    
+
     padded_front = pad_shape_front(x, target_shape)
     assert padded_front.data_ptr() == x.data_ptr()
-    
+
     padded_back = pad_shape_back(x, target_shape)
     assert padded_back.data_ptr() == x.data_ptr()
 
+
 # ===== Linear Algebra Tests =====
+
 
 def test_vector_lstsq():
     # Test simple 2D case
@@ -149,11 +160,12 @@ def test_vector_lstsq():
     assert torch.allclose(A @ x, y, atol=1e-5)
 
     # Test batched case
-    batch_A = torch.stack([A, 2*A])
-    batch_y = torch.stack([y, 2*y])
+    batch_A = torch.stack([A, 2 * A])
+    batch_y = torch.stack([y, 2 * y])
     batch_x = vector_lstsq(batch_A, batch_y)
     assert batch_x.shape == torch.Size([2, 2])
     assert torch.allclose(batch_A @ batch_x[..., None], batch_y[..., None], atol=1e-5)
+
 
 def test_logdet_pd():
     # Test 2x2 case
@@ -163,11 +175,13 @@ def test_logdet_pd():
     assert torch.allclose(logdet, expected)
 
     # Test batched case
-    batch_A = torch.stack([A, 2*A])
+    batch_A = torch.stack([A, 2 * A])
     batch_logdet = logdet_pd(batch_A)
-    expected = torch.tensor([torch.log(torch.tensor(3.75)), 
-                           torch.log(torch.tensor(3.75 * 4))])
+    expected = torch.tensor(
+        [torch.log(torch.tensor(3.75)), torch.log(torch.tensor(3.75 * 4))]
+    )
     assert torch.allclose(batch_logdet, expected)
+
 
 def test_sqrt_psd():
     # Test identity matrix
@@ -187,6 +201,6 @@ def test_sqrt_psd():
     assert torch.allclose(sqrt_A @ sqrt_A, A)
 
     # Test batched case
-    batch_A = torch.stack([A, 2*A])
+    batch_A = torch.stack([A, 2 * A])
     batch_sqrt_A = sqrt_psd(batch_A)
-    assert torch.allclose(batch_sqrt_A @ batch_sqrt_A.mT, batch_A) 
+    assert torch.allclose(batch_sqrt_A @ batch_sqrt_A.mT, batch_A)

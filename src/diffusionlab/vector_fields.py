@@ -2,7 +2,8 @@ import enum
 from typing import Callable
 import torch
 
-from diffusionlab.utils import pad_shape_back 
+from diffusionlab.utils import pad_shape_back
+
 
 class VectorFieldType(enum.Enum):
     SCORE = enum.auto()
@@ -13,10 +14,15 @@ class VectorFieldType(enum.Enum):
 
 class VectorField:
     """
-    A wrapper around a function (x, t) -> f(x, t) which provides some extra data, 
+    A wrapper around a function (x, t) -> f(x, t) which provides some extra data,
     namely the type of vector field the function f represents.
     """
-    def __init__(self, f: Callable[[torch.Tensor, torch.Tensor], torch.Tensor], vector_field_type: VectorFieldType):
+
+    def __init__(
+        self,
+        f: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+        vector_field_type: VectorFieldType,
+    ):
         self.f: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = f
         self.vector_field_type: VectorFieldType = vector_field_type
 
@@ -25,10 +31,14 @@ class VectorField:
 
 
 def convert_vector_field_type(
-        x: torch.Tensor, fx: torch.Tensor, 
-        alpha: torch.Tensor, sigma: torch.Tensor, 
-        alpha_prime: torch.Tensor, sigma_prime: torch.Tensor, 
-        in_type: VectorFieldType, out_type: VectorFieldType
+    x: torch.Tensor,
+    fx: torch.Tensor,
+    alpha: torch.Tensor,
+    sigma: torch.Tensor,
+    alpha_prime: torch.Tensor,
+    sigma_prime: torch.Tensor,
+    in_type: VectorFieldType,
+    out_type: VectorFieldType,
 ) -> torch.Tensor:
     """
     Converts the output of a vector field from one type to another.
@@ -100,22 +110,26 @@ def convert_vector_field_type(
     sigma_ratio = sigma_prime / sigma
     ratio_diff = sigma_ratio - alpha_ratio
     converted_fx = fx
-    
+
     if in_type == VectorFieldType.SCORE:
         if out_type == VectorFieldType.X0:
             converted_fx = (x + sigma**2 * fx) / alpha  # From equation (12)
         elif out_type == VectorFieldType.EPS:
             converted_fx = -sigma * fx  # From equation (14)
         elif out_type == VectorFieldType.V:
-            converted_fx = alpha_ratio * x - sigma**2 * ratio_diff * fx  # From equation (16)
-    
+            converted_fx = (
+                alpha_ratio * x - sigma**2 * ratio_diff * fx
+            )  # From equation (16)
+
     elif in_type == VectorFieldType.X0:
         if out_type == VectorFieldType.SCORE:
             converted_fx = (alpha * fx - x) / sigma**2  # From equation (13)
         elif out_type == VectorFieldType.EPS:
             converted_fx = (x - alpha * fx) / sigma  # From equation (4)
         elif out_type == VectorFieldType.V:
-            converted_fx = sigma_ratio * x - alpha * ratio_diff * fx  # From equation (9)
+            converted_fx = (
+                sigma_ratio * x - alpha * ratio_diff * fx
+            )  # From equation (9)
 
     elif in_type == VectorFieldType.EPS:
         if out_type == VectorFieldType.SCORE:
@@ -123,14 +137,22 @@ def convert_vector_field_type(
         elif out_type == VectorFieldType.X0:
             converted_fx = (x - sigma * fx) / alpha  # From equation (3)
         elif out_type == VectorFieldType.V:
-            converted_fx = alpha_ratio * x + sigma * ratio_diff * fx  # From equation (7)
+            converted_fx = (
+                alpha_ratio * x + sigma * ratio_diff * fx
+            )  # From equation (7)
 
     elif in_type == VectorFieldType.V:
         if out_type == VectorFieldType.SCORE:
-            converted_fx = (alpha_ratio * x - fx) / (sigma**2 * ratio_diff)  # From equation (17)
+            converted_fx = (alpha_ratio * x - fx) / (
+                sigma**2 * ratio_diff
+            )  # From equation (17)
         elif out_type == VectorFieldType.X0:
-            converted_fx = (sigma_ratio * x - fx) / (alpha * ratio_diff)  # From equation (10)
+            converted_fx = (sigma_ratio * x - fx) / (
+                alpha * ratio_diff
+            )  # From equation (10)
         elif out_type == VectorFieldType.EPS:
-            converted_fx = (fx - alpha_ratio * x) / (sigma * ratio_diff)  # From equation (8)
-    
+            converted_fx = (fx - alpha_ratio * x) / (
+                sigma * ratio_diff
+            )  # From equation (8)
+
     return converted_fx
