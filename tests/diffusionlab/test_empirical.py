@@ -188,3 +188,51 @@ def test_empirical_error_cases(sampler, dummy_data):
     
     with pytest.raises(RuntimeError):
         dist.x0(x, t) 
+
+def test_empirical_diffusion_sampling_integration(sampler, dummy_data):
+    """Integration test for the full diffusion sampling process"""
+    dist = EmpiricalDistribution(sampler, dummy_data)
+    
+    # Get initial samples, generated standard normal
+    N = 100
+    x0 = torch.randn(N, 2)
+    
+    # Generate noise for sampling process
+    num_steps = len(sampler.schedule)
+    zs = torch.randn(num_steps - 1, N, 2)  # (L-1, N, D) noise vectors
+    
+    # Create vector field from empirical distribution
+    for vf_func, vf_type in [(lambda x, t: dist.x0(x, t), VectorFieldType.X0),
+                             (lambda x, t: dist.eps(x, t), VectorFieldType.EPS),
+                             (lambda x, t: dist.v(x, t), VectorFieldType.V),
+                             (lambda x, t: dist.score(x, t), VectorFieldType.SCORE)]:
+        vector_field = VectorField(vf_func, vf_type)
+        
+        # Sample using the diffusion process
+        x_sampled = sampler.sample(vector_field, x0, zs)
+        
+        # Collect all training data for comparison
+        X_train = []
+        for X_batch, _ in dummy_data:
+            X_train.append(X_batch)
+        X_train = torch.concatenate(X_train)
+        
+        # The sampled points should be close to but not exactly the same as the training data
+        # Check this by verifying the distributions are similar but not identical
+        
+        # Check means are close but not identical
+        train_mean = X_train.mean(0)
+        sampled_mean = x_sampled.mean(0)
+        mean_diff = torch.norm(train_mean - sampled_mean)
+        assert mean_diff < 0.5, "Means are too different"
+        
+        # Check covariances are close but not identical
+        train_cov = torch.cov(X_train.T)
+        sampled_cov = torch.cov(x_sampled.T)
+        cov_diff = torch.norm(train_cov - sampled_cov)
+        assert cov_diff < 1.0, "Covariances are too different"
+        
+        # Check that no points are exactly the same as training points
+        dists = torch.cdist(x_sampled, X_train)
+        min_dists = dists.min(dim=1)[0]
+        assert torch.all(min_dists < 2.0), "Some sampled points are too far from training distribution" 

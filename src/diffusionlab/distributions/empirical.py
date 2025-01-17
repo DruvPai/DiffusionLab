@@ -28,19 +28,19 @@ class EmpiricalDistribution(Distribution):
         sigma = sampler.sigma(t)  # (N, )
 
         softmax_denom = torch.zeros_like(t)  # (N, )
-        x0_hat = torch.zeros_like(x) # (N, D*)
+        x0_hat = torch.zeros_like(x) # (N, *D)
         for X_batch, y_batch in data:
-            X_batch = X_batch.to(x.device, non_blocking=True)  # (B, D*)
-            X_batch_flattened = torch.flatten(X_batch, start_dim=1, end_dim=-1)  # (B, *D)
-            means_batch_flattened = pad_shape_back(alpha, X_batch_flattened.shape) * X_batch_flattened
-            dists = torch.cdist(x_flattened, means_batch_flattened) ** 2  # (N, B)
+            X_batch = X_batch.to(x.device, non_blocking=True)  # (B, *D)
+            X_batch_flattened = torch.flatten(X_batch, start_dim=1, end_dim=-1)[None, ...]  # (1, B, D*)
+            alpha_X_batch_flattened = pad_shape_back(alpha, X_batch_flattened.shape) * X_batch_flattened  # (N, B, D*)
+            dists = torch.cdist(x_flattened[:, None, ...], alpha_X_batch_flattened)[:, 0, ...] ** 2  # (N, B)
             exp_dists = torch.exp(-dists / (2 * pad_shape_back(sigma, dists.shape) ** 2))  # (N, B)
             softmax_denom += torch.sum(exp_dists, dim=1)  # (N, )
-            theta_batch_singleton = X_batch_flattened[None, ...]  # (1, B, D*)
-            x0_hat += torch.sum(theta_batch_singleton * pad_shape_back(exp_dists, theta_batch_singleton.shape), dim=1)  # (N, D*)
+            X_batch_singleton = X_batch[None, ...]  # (1, B, *D)
+            x0_hat += torch.sum(X_batch_singleton * pad_shape_back(exp_dists, X_batch_singleton.shape), dim=1)  # (N, *D)
 
         softmax_denom = torch.maximum(softmax_denom, torch.tensor(torch.finfo(softmax_denom.dtype).eps, device=softmax_denom.device))
-        x0_hat = x0_hat / pad_shape_back(softmax_denom, x0_hat.shape)  # (N, D*)
+        x0_hat = x0_hat / pad_shape_back(softmax_denom, x0_hat.shape)  # (N, *D)
         return x0_hat
 
 
