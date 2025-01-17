@@ -1,6 +1,6 @@
 # DiffusionLab
 
-Insert some fancy logo here. Maybe I should make it using a diffusion model.
+(Web documentation, including nice logo, coming soon.)
 
 ## What is DiffusionLab?
 
