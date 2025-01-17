@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "diffusionlab"
+version = "0.1.0"
+description = "Easy no-frills implementations of common abstractions for diffusion models."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "lightning>=2.5.0.post0",
+    "pytest>=8.3.4",
+    "torch>=2.5.1",
+    "torchmetrics>=1.6.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/diffusionlab"]
