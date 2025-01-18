@@ -29,7 +29,7 @@ Then (probably in a `conda` environment or a `venv`) install the codebase as a l
 ```
 pip install .
 ```
-Then feel free to use it! The import is `import diffusionlab`.
+Then feel free to use it! The import is `import diffusionlab`. You can see an example usage in `demo.py`.
 
 ## Roadmap/TODOs
 
