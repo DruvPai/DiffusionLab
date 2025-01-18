@@ -15,14 +15,18 @@ class DummyNet(nn.Module):
     def __init__(self):
         super().__init__()
         self.w1 = nn.Linear(2, 100)
+        self.relu1 = nn.ReLU()
         self.w2 = nn.Linear(100, 100)
+        self.relu2 = nn.ReLU()
         self.w3 = nn.Linear(100, 2)
         self.t_embed = nn.Parameter(torch.randn((100,)))
 
     def forward(self, x, t):
         t_embed = t[:, None] * self.t_embed[None, :]
-        x = self.w1(x) + t_embed
+        x = self.w1(x)
+        x = self.relu1(x) + t_embed
         x = self.w2(x)
+        x = self.relu2(x)
         x = self.w3(x)
         return x
 
