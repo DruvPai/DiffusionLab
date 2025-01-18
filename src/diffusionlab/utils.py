@@ -24,7 +24,7 @@ def scalar_derivative(
 
     def f_prime(x: torch.Tensor) -> torch.Tensor:
         dfx = cast(torch.Tensor, df(x))
-        if len(dfx.shape) > 1:
+        if dfx.ndim > 1:
             x_size = prod(x.shape)
             dfx = dfx.reshape(x_size, x_size)
             dfx = dfx.diagonal(dim1=0, dim2=1)
