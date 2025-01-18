@@ -35,6 +35,7 @@ Then feel free to use it! The import is `import diffusionlab`.
 
 - Add Diffusers-style pipelines for common tasks (e.g., training, sampling)
 - Support latent diffusion
+- Support conditional diffusion samplers like CFG
 - Add patch-based optimal denoiser as in [Niedoba et al](https://arxiv.org/abs/2411.19339)
 - Upload to Pip, making it a proper package (once more battle-tested and confirmed working)
 

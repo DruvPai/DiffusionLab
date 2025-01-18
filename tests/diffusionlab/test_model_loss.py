@@ -162,3 +162,4 @@ def test_loss_different_targets():
         loss_fn = SamplewiseDiffusionLoss(sampler, vf_type)
         loss = loss_fn(xt, fxt, x0, eps, t)
         assert loss.shape == (batch_size,), f"Loss shape incorrect for {vf_type}"
+        assert torch.all(loss >= 0), f"Loss should be non-negative for {vf_type}"

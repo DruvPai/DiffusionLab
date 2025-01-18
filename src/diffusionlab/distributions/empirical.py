@@ -18,13 +18,13 @@ class EmpiricalDistribution(Distribution):
     """
 
     def __init__(self, sampler: Sampler, labeled_data: DataLoader):
-        super().__init__(sampler, {"data": labeled_data})
+        super().__init__(sampler, {"labeled_data": labeled_data})
         self.labeled_data = labeled_data
 
     @classmethod
     def validate_params(cls, dist_params: Dict[str, Any]) -> None:
-        assert "data" in dist_params
-        data = dist_params["data"]
+        assert "labeled_data" in dist_params
+        data = dist_params["labeled_data"]
         assert isinstance(data, DataLoader)
         assert len(data) > 0
 
@@ -36,7 +36,7 @@ class EmpiricalDistribution(Distribution):
         xt: torch.Tensor,
         t: torch.Tensor,
     ) -> torch.Tensor:
-        data = dist_params["data"]
+        data = dist_params["labeled_data"]
 
         x_flattened = torch.flatten(xt, start_dim=1, end_dim=-1)  # (N, *D)
 

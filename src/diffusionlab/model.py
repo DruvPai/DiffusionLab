@@ -75,24 +75,28 @@ class DiffusionModel(LightningModule, VectorField):
 
     def aggregate_loss(self, x: torch.Tensor) -> torch.Tensor:
         t_idx = torch.multinomial(
-            self.t_loss_probs_precomputed, self.N_noise_per_sample, replacement=True
-        ).to(x.device)
-        t = self.sampler.schedule[t_idx]
-        t_weights = self.t_loss_weights_precomputed[t_idx]
+            self.t_loss_probs_precomputed, x.shape[0], replacement=True
+        ).to(x.device, non_blocking=True)
+        t = self.sampler.schedule.to(x.device, non_blocking=True)[t_idx]
+        t_weights = self.t_loss_weights_precomputed.to(x.device, non_blocking=True)[
+            t_idx
+        ]
         mean_loss = self.loss(x, t, t_weights)
         return mean_loss
 
     def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
-        loss = self.aggregate_loss(batch)
+        x, metadata = batch
+        loss = self.aggregate_loss(x)
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
     def validation_step(
         self, batch: torch.Tensor, batch_idx: int
     ) -> Dict[str, torch.Tensor]:
-        loss = self.aggregate_loss(batch)
+        x, metadata = batch
+        loss = self.aggregate_loss(x)
         metric_values = {
-            metric_name: metric(batch, self)
+            metric_name: metric(x, metadata, self)
             for metric_name, metric in self.val_metrics.items()
         }
         metric_values["val_loss"] = loss
