@@ -69,16 +69,14 @@ class GMMDistribution(Distribution):
         priors = dist_params["priors"]  # (K, )
 
         K, D = means.shape
-        N = xt.shape[0]
+        xt.shape[0]
 
         alpha = sampler.alpha(t)  # (N, )
         sigma = sampler.sigma(t)  # (N, )
 
         covs_t = (alpha[:, None, None, None] ** 2) * covs[None, :, :, :] + (
             sigma[:, None, None, None] ** 2
-        ) * torch.eye(D, device=xt.device)[
-            None, None, :, :
-        ]  # (N, K, D, D)
+        ) * torch.eye(D, device=xt.device)[None, None, :, :]  # (N, K, D, D)
         centered_x = (
             xt[:, None, :] - alpha[:, None, None] * means[None, :, :]
         )  # (N, K, D)
@@ -177,7 +175,7 @@ class IsoHomoGMMDistribution(Distribution):
         priors = dist_params["priors"]  # (K, )
 
         K, D = means.shape
-        N = xt.shape[0]
+        xt.shape[0]
 
         alpha = sampler.alpha(t)  # (N, )
         sigma = sampler.sigma(t)  # (N, )
