@@ -1,9 +1,8 @@
-import torch
-from torch.func import jacrev
-
-
 from math import prod
 from typing import Callable, cast
+
+import torch
+from torch.func import jacrev
 
 
 def scalar_derivative(
@@ -75,15 +74,43 @@ def pad_shape_back(x: torch.Tensor, target_shape: torch.Size) -> torch.Tensor:
 
 
 def vector_lstsq(A: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    """
+    Computes the least-squares solution to the linear equation Ax = y, broadcasting over (A, x, y).
+
+    Arguments:
+        A: A matrix of shape (..., M, N).
+        y: A vector or matrix of shape (..., M).
+
+    Returns:
+        x: The least-squares solution of shape (..., N).
+    """
     return torch.linalg.lstsq(A, y[..., None]).solution[..., 0]
 
 
 def logdet_pd(A: torch.Tensor) -> torch.Tensor:
+    """
+    Computes the log-determinant of a positive-definite matrix A, broadcasting over A.
+
+    Arguments:
+        A: A positive-definite matrix of shape (..., N, N).
+
+    Returns:
+        logdet_A: The log-determinant of A of shape (...).
+    """
     L = torch.linalg.cholesky(A)
     eigvals = torch.diagonal(L, dim1=-2, dim2=-1)
     return 2 * torch.sum(torch.log(eigvals), dim=-1)
 
 
 def sqrt_psd(A: torch.Tensor) -> torch.Tensor:
+    """
+    Computes the matrix square root of a positive-semidefinite matrix A, broadcasting over A.
+
+    Arguments:
+        A: A positive-semidefinite matrix of shape (..., N, N).
+
+    Returns:
+        sqrt_A: The matrix square root of A of shape (..., N, N).
+    """
     L, Q = torch.linalg.eigh(A)
     return Q @ torch.diag_embed(torch.sqrt(L)) @ Q.transpose(-2, -1)

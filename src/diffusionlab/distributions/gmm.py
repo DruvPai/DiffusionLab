@@ -1,9 +1,10 @@
-from typing import Any, Dict, Literal, Tuple
+from typing import Any, Dict, Tuple
+
 import torch
 
 from diffusionlab.distributions.base import Distribution
 from diffusionlab.samplers import Sampler
-from diffusionlab.utils import vector_lstsq, logdet_pd, sqrt_psd
+from diffusionlab.utils import logdet_pd, sqrt_psd, vector_lstsq
 
 
 class GMMDistribution(Distribution):
@@ -25,9 +26,9 @@ class GMMDistribution(Distribution):
         priors: torch.Tensor,
     ):
         super().__init__(sampler, {"means": means, "covs": covs, "priors": priors})
-        self.means = means
-        self.covs = covs
-        self.priors = priors
+        self.means: torch.Tensor = means
+        self.covs: torch.Tensor = covs
+        self.priors: torch.Tensor = priors
 
     @classmethod
     def validate_params(cls, dist_params: Dict[str, Any]) -> None:
@@ -139,9 +140,9 @@ class IsoHomoGMMDistribution(Distribution):
         priors: torch.Tensor,
     ):
         super().__init__(sampler, {"means": means, "var": var, "priors": priors})
-        self.means = means
-        self.var = var
-        self.priors = priors
+        self.means: torch.Tensor = means
+        self.var: torch.Tensor = var
+        self.priors: torch.Tensor = priors
 
     @classmethod
     def validate_params(cls, dist_params: Dict[str, Any]) -> None:

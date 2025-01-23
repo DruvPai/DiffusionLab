@@ -1,9 +1,7 @@
-from collections.abc import Sequence
-from typing import Callable, List, Optional, Literal, Dict
-from lightning import LightningModule
+from typing import Callable, Dict, Literal
 import torch
 from torch import nn, optim
-from torchmetrics import Metric
+from lightning import LightningModule
 
 from diffusionlab.loss import SamplewiseDiffusionLoss
 from diffusionlab.samplers import Sampler

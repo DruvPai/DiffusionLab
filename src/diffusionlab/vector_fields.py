@@ -1,5 +1,6 @@
 import enum
 from typing import Callable
+
 import torch
 
 from diffusionlab.utils import pad_shape_back
