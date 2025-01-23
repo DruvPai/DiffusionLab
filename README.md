@@ -23,6 +23,7 @@ If you want to add a feature in the spirit of the above motivation, or want to m
 ### Install via Pip
 
 `pip install diffusionlab`
+
 Requires Python >= 3.12. (If this is an issue, make a GitHub Issue --- the code should be backward-compatible without many changes).
 
 ### Install locally
