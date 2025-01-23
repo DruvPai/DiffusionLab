@@ -1,4 +1,5 @@
 from typing import Any, Dict, Tuple
+
 import torch
 from torch.utils.data import DataLoader
 
@@ -19,14 +20,14 @@ class EmpiricalDistribution(Distribution):
 
     def __init__(self, sampler: Sampler, labeled_data: DataLoader):
         super().__init__(sampler, {"labeled_data": labeled_data})
-        self.labeled_data = labeled_data
+        self.labeled_data: DataLoader = labeled_data
 
     @classmethod
     def validate_params(cls, dist_params: Dict[str, Any]) -> None:
         assert "labeled_data" in dist_params
-        data = dist_params["labeled_data"]
-        assert isinstance(data, DataLoader)
-        assert len(data) > 0
+        labeled_data = dist_params["labeled_data"]
+        assert isinstance(labeled_data, DataLoader)
+        assert len(labeled_data) > 0
 
     @classmethod
     def stateless_x0(

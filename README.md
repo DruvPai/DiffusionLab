@@ -20,6 +20,13 @@ If you want to add a feature in the spirit of the above motivation, or want to m
 
 ## How to Install
 
+### Install via Pip
+
+`pip install diffusionlab`
+Requires Python >= 3.12. (If this is an issue, make a GitHub Issue --- the code should be backward-compatible without many changes).
+
+### Install locally
+
 Run `git clone`:
 ```
 git clone https://github.com/DruvPai/DiffusionLab
@@ -37,7 +44,11 @@ Then feel free to use it! The import is `import diffusionlab`. You can see an ex
 - Support latent diffusion
 - Support conditional diffusion samplers like CFG
 - Add patch-based optimal denoiser as in [Niedoba et al](https://arxiv.org/abs/2411.19339)
-- Upload to Pip, making it a proper package (once more battle-tested and confirmed working)
+
+Version guide:
+- Major version update (1 -> 2, etc): initial upload or major refactor.
+- Minor version update (1.0 -> 1.1 -> 1.2, etc): breaking change or large feature integration or large update.
+- Anything smaller (1.0.0 -> 1.0.1 -> 1.0.2, etc): non-breaking change, small feature integration, better documentation, etc.
 
 ## How to Contribute
 

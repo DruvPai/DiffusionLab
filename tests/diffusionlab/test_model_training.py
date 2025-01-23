@@ -1,13 +1,12 @@
-from lightning import Trainer
-from torch.utils.data import DataLoader, TensorDataset
 import pytest
-import warnings
 import torch
+from lightning import Trainer
 from torch import nn, optim
-from diffusionlab.distributions.gmm import GMMDistribution, IsoHomoGMMDistribution
+from torch.utils.data import DataLoader, TensorDataset
+
+from diffusionlab.distributions.gmm import IsoHomoGMMDistribution
 from diffusionlab.model import DiffusionModel
-from diffusionlab.loss import SamplewiseDiffusionLoss
-from diffusionlab.samplers import FMSampler, Sampler
+from diffusionlab.samplers import FMSampler
 from diffusionlab.vector_fields import VectorFieldType
 
 

@@ -1,4 +1,3 @@
-from os import supports_bytes_environ
 import pytest
 import torch
 from torch import nn, optim

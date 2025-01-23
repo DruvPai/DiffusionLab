@@ -1,8 +1,8 @@
 from typing import Any, Callable, Dict, Tuple
+
 import torch
 
-from diffusionlab.utils import pad_shape_back
-from diffusionlab.utils import scalar_derivative
+from diffusionlab.utils import pad_shape_back, scalar_derivative
 from diffusionlab.vector_fields import VectorField, VectorFieldType
 
 

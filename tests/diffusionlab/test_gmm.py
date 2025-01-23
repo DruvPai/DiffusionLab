@@ -2,7 +2,6 @@ import pytest
 import torch
 from diffusionlab.distributions.gmm import GMMDistribution, IsoHomoGMMDistribution
 from diffusionlab.samplers import VPSampler
-from diffusionlab.vector_fields import VectorFieldType
 
 
 @pytest.fixture
