@@ -11,7 +11,6 @@ def sampler():
 
 @pytest.fixture
 def gmm_params():
-    K = 3  # number of components
     D = 2  # dimension
     device = torch.device("cpu")
 
@@ -206,7 +205,7 @@ def test_iso_homo_gmm_sampling_with_x0(sampler, iso_homo_gmm_params):
 def test_gmm_device_movement(sampler, gmm_params):
     """Test that distributions can be moved between devices"""
     means, covs, priors = gmm_params
-    dist = GMMDistribution(sampler, means, covs, priors)
+    GMMDistribution(sampler, means, covs, priors)
 
     # Move to CUDA
     device = torch.device("cuda:0")
@@ -232,7 +231,7 @@ def test_gmm_device_movement(sampler, gmm_params):
 def test_iso_homo_gmm_device_movement(sampler, iso_homo_gmm_params):
     """Test that isotropic homogeneous distributions can be moved between devices"""
     means, var, priors = iso_homo_gmm_params
-    dist = IsoHomoGMMDistribution(sampler, means, var, priors)
+    IsoHomoGMMDistribution(sampler, means, var, priors)
 
     # Move to CUDA
     device = torch.device("cuda:0")

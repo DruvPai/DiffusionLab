@@ -139,8 +139,7 @@ def test_sampler_with_score():
 
 
 def test_invalid_schedule_params():
-    alpha = lambda t: torch.ones_like(t)
-    sigma = lambda t: t
+    lambda t: torch.ones_like(t)
 
     # Test invalid t_min, t_max
     with pytest.raises(AssertionError):

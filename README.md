@@ -60,7 +60,7 @@ make a new branch, and make a PR when you feel ready. Here are a couple quick gu
 - If the function involves nontrivial dimension manipulation, please annotate each tensor with its shape in a comment beside its definition. Examples are found throughout the codebase.
 - Please add tests for all nontrivial code.
 - If you want to add a new package, update the `pyproject.toml` accordingly.
-- We use `black` for formatting.
+- We use `Ruff` for formatting.
 
 Here "nontrivial" is left up to your judgement. A good first contribution is to add more integration tests.
 

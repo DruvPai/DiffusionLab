@@ -6,7 +6,7 @@ from torch.func import jacrev
 
 
 def scalar_derivative(
-    f: Callable[[torch.Tensor], torch.Tensor]
+    f: Callable[[torch.Tensor], torch.Tensor],
 ) -> Callable[[torch.Tensor], torch.Tensor]:
     """
     Computes the scalar derivative of a function f: R -> R.

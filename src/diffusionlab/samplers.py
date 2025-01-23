@@ -157,7 +157,9 @@ class Sampler:
                 f = self.sample_step_deterministic_v
         return f
 
-    def _get_step_quantities(self, zs: torch.Tensor, idx: int) -> Tuple[
+    def _get_step_quantities(
+        self, zs: torch.Tensor, idx: int
+    ) -> Tuple[
         torch.Tensor,
         torch.Tensor,
         torch.Tensor,

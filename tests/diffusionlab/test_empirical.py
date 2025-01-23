@@ -247,6 +247,6 @@ def test_empirical_diffusion_sampling_integration(sampler, dummy_data):
         # Check that no points are exactly the same as training points
         dists = torch.cdist(x_sampled, X_train)
         min_dists = dists.min(dim=1)[0]
-        assert torch.all(
-            min_dists < 2.0
-        ), "Some sampled points are too far from training distribution"
+        assert torch.all(min_dists < 2.0), (
+            "Some sampled points are too far from training distribution"
+        )
