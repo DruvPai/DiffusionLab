@@ -87,7 +87,9 @@ def test_model_training(model, dummy_dataset):
     x, metadata = next(iter(val_dataloader))
     untrained_loss = model.aggregate_loss(x)
     with pytest.warns(UserWarning):
-        trainer = Trainer(max_epochs=100, accelerator="cpu", logger=False, enable_checkpointing=False)
+        trainer = Trainer(
+            max_epochs=100, accelerator="cpu", logger=False, enable_checkpointing=False
+        )
         trainer.fit(model, train_dataloader, val_dataloader)
     trained_loss = model.aggregate_loss(x)
     assert trained_loss < untrained_loss / 10
@@ -99,7 +101,9 @@ def test_model_training_cuda(model, dummy_dataset):
     x, metadata = next(iter(val_dataloader))
     untrained_loss = model.aggregate_loss(x)
     with pytest.warns(UserWarning):
-        trainer = Trainer(max_epochs=100, accelerator="cuda", logger=False, enable_checkpointing=False)
+        trainer = Trainer(
+            max_epochs=100, accelerator="cuda", logger=False, enable_checkpointing=False
+        )
         trainer.fit(model, train_dataloader, val_dataloader)
     trained_loss = model.aggregate_loss(x)
     assert trained_loss < untrained_loss / 10

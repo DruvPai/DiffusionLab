@@ -113,4 +113,5 @@ def sqrt_psd(A: torch.Tensor) -> torch.Tensor:
         sqrt_A: The matrix square root of A of shape (..., N, N).
     """
     L, Q = torch.linalg.eigh(A)
-    return Q @ torch.diag_embed(torch.sqrt(L)) @ Q.transpose(-2, -1)
+    L_new = torch.where(L > 0, torch.sqrt(L), torch.zeros_like(L))
+    return Q @ torch.diag_embed(L_new) @ Q.transpose(-2, -1)

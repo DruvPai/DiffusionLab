@@ -199,7 +199,43 @@ def test_sqrt_psd():
     sqrt_A = sqrt_psd(A)
     assert torch.allclose(sqrt_A @ sqrt_A, A)
 
-    # Test batched case
-    batch_A = torch.stack([A, 2 * A])
+    # Test zero matrix
+    A = torch.zeros(3, 3)
+    sqrt_A = sqrt_psd(A)
+    assert torch.allclose(sqrt_A, torch.zeros_like(A))
+
+    # Test matrix with very small positive eigenvalues
+    A = torch.tensor([[1e-8, 0.0], [0.0, 1e-8]])
+    sqrt_A = sqrt_psd(A)
+    expected = torch.tensor([[1e-4, 0.0], [0.0, 1e-4]])
+    assert torch.allclose(sqrt_A, expected, atol=1e-10)
+
+    # Test rank-deficient matrix
+    A = torch.tensor([[1.0, 1.0], [1.0, 1.0]])  # rank-1 matrix
+    sqrt_A = sqrt_psd(A)
+    assert torch.allclose(sqrt_A @ sqrt_A, A)
+    # Verify rank deficiency by checking determinant is zero
+    assert torch.allclose(torch.det(sqrt_A), torch.tensor(0.0), atol=1e-6)
+
+    # Test higher dimensional symmetric PSD matrix
+    A = torch.tensor([[4.0, 1.0, 0.0], [1.0, 5.0, 2.0], [0.0, 2.0, 6.0]])
+    sqrt_A = sqrt_psd(A)
+    assert torch.allclose(sqrt_A @ sqrt_A, A, atol=1e-6)
+    assert torch.allclose(sqrt_A, sqrt_A.T)  # Result should be symmetric
+
+    # Test batched case with different matrices
+    batch_A = torch.stack(
+        [
+            torch.eye(2),  # identity
+            torch.tensor([[4.0, 0.0], [0.0, 9.0]]),  # diagonal
+            torch.tensor([[2.0, 1.0], [1.0, 2.0]]),  # dense symmetric
+        ]
+    )
     batch_sqrt_A = sqrt_psd(batch_A)
     assert torch.allclose(batch_sqrt_A @ batch_sqrt_A.mT, batch_A)
+
+    # Test broadcasting with different batch dimensions
+    A1 = torch.eye(2).expand(3, 4, 2, 2)  # Shape: (3, 4, 2, 2)
+    sqrt_A1 = sqrt_psd(A1)
+    assert sqrt_A1.shape == (3, 4, 2, 2)
+    assert torch.allclose(sqrt_A1 @ sqrt_A1.mT, A1)
