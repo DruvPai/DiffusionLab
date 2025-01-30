@@ -215,3 +215,19 @@ class Distribution:
             Note that the samples are placed on the device corresponding to the sampler.
         """
         raise NotImplementedError
+
+    @staticmethod
+    def batch_dist_params(
+        N: int, dist_params: Dict[str, torch.Tensor]
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Add a batch dimension to the distribution parameters.
+
+        Arguments:
+            N: The number of samples in the batch.
+            dist_params: A dictionary of parameters for the distribution.
+
+        Returns:
+            A dictionary of parameters for the distribution, with a batch dimension added.
+        """
+        return {k: v.unsqueeze(0).expand(N, *v.shape) for k, v in dist_params.items()}

@@ -22,6 +22,9 @@ class EmpiricalDistribution(Distribution):
 
     Distribution Hyperparameters:
         - labeled_data: A DataLoader of data which spawns the empirical distribution, where each data sample is a (data, label) tuple. Both data and label are PyTorch tensors.
+
+    Note:
+        - This class has no sample() method as it's difficult to sample randomly from a DataLoader. In practice, you can sample directly from the DataLoader and apply filtering there.
     """
 
     @classmethod
@@ -81,22 +84,3 @@ class EmpiricalDistribution(Distribution):
         )
         x0_hat = x0_hat / pad_shape_back(softmax_denom, x0_hat.shape)  # (N, *D)
         return x0_hat
-
-    @classmethod
-    def sample(
-        cls,
-        N: int,
-        dist_params: Dict[str, torch.Tensor],
-        dist_hparams: Dict[str, Any],
-    ) -> Tuple[torch.Tensor, Any]:
-        samples_X = []
-        samples_y = []
-        while len(samples_X) < N:
-            for X_batch, y_batch in dist_hparams["labeled_data"]:
-                samples_X.append(X_batch)
-                samples_y.append(y_batch)
-                if len(samples_X) >= N:
-                    break
-        X = torch.concatenate(samples_X)[:N]
-        y = torch.concatenate(samples_y)[:N]
-        return X, y
