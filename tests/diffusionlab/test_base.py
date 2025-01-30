@@ -3,7 +3,6 @@ import torch
 
 from diffusionlab.distributions.base import Distribution
 from diffusionlab.samplers import Sampler
-from diffusionlab.vector_fields import VectorFieldType
 
 
 class MockSampler(Sampler):
