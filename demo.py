@@ -41,13 +41,14 @@ sampler = FMSampler(is_stochastic=False, t_min=t_min, t_max=t_max, L=L)
 means = torch.randn(K, D) * 3
 var = torch.tensor(0.5)
 priors = torch.ones(K) / K
-dist = IsoHomoGMMDistribution(sampler, means, var, priors)
+dist_params = {"means": means, "var": var, "priors": priors}
+dist = IsoHomoGMMDistribution()
 
 N_train = 100
 N_val = 50
 N_batch = 50
-X_train, y_train = dist.sample(N_train)
-X_val, y_val = dist.sample(N_val)
+X_train, y_train = dist.sample(N_train, dist_params, {})
+X_val, y_val = dist.sample(N_val, dist_params, {})
 train_dataloader = DataLoader(
     TensorDataset(X_train, y_train), batch_size=N_batch, shuffle=True
 )
@@ -79,7 +80,12 @@ trainer = lightning.Trainer(max_epochs=N_epochs, accelerator="cpu")
 trainer.fit(model, train_dataloader, val_dataloader)
 
 sampling_vector_field = VectorField(model, vector_field_type=model.vector_field_type)
-# sampling_vector_field = VectorField(lambda x, t: dist.eps(x, t), vector_field_type=VectorFieldType.EPS)  # if you want to use the true eps function
+# sampling_vector_field = VectorField(
+#     lambda x, t: dist.eps(
+#         x, t, sampler, dist.batch_dist_params(x.shape[0], dist_params), {}
+#     ),
+#     vector_field_type=VectorFieldType.EPS,
+# )  # if you want to use the true eps function
 
 N_sample = 20
 X0 = torch.randn(N_sample, D)

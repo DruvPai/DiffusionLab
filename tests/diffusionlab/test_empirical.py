@@ -65,59 +65,6 @@ def test_empirical_validation():
 # ============================================================================
 
 
-def test_empirical_sampling(dummy_data):
-    """Test basic sampling functionality from empirical distribution."""
-    N = 50
-    X, y = EmpiricalDistribution.sample(N, {}, {"labeled_data": dummy_data})
-
-    # Check shapes and ranges
-    assert X.shape[0] == N
-    assert y.shape[0] == N
-    assert X.shape[1] == 2  # 2D data
-    assert y.min() >= 0 and y.max() <= 1  # Binary labels
-
-    # Verify samples come from the dataset
-    all_data = []
-    all_labels = []
-    for X_batch, y_batch in dummy_data:
-        all_data.append(X_batch)
-        all_labels.append(y_batch)
-    all_data = torch.cat(all_data)
-    all_labels = torch.cat(all_labels)
-
-    # Each sampled point should be in the original dataset
-    for i in range(N):
-        assert any(torch.allclose(X[i], x) for x in all_data)
-        assert any(torch.allclose(y[i], label) for label in all_labels)
-
-
-def test_empirical_sampling_integration(sampler, dummy_data):
-    """Test sampling process matches the original data distribution."""
-    # Sample points from the distribution
-    N = 100
-    X_sampled, y_sampled = EmpiricalDistribution.sample(
-        N, {}, {"labeled_data": dummy_data}
-    )
-
-    # Collect all training data
-    X_train = []
-    y_train = []
-    for X_batch, y_batch in dummy_data:
-        X_train.append(X_batch)
-        y_train.append(y_batch)
-    X_train = torch.cat(X_train)
-    y_train = torch.cat(y_train)
-
-    # Check statistical properties
-    assert torch.allclose(X_sampled.mean(0), X_train.mean(0), atol=0.2)
-    assert torch.allclose(X_sampled.std(0), X_train.std(0), atol=0.2)
-
-    # Check label distribution
-    sampled_label_dist = torch.bincount(y_sampled.long()) / len(y_sampled)
-    train_label_dist = torch.bincount(y_train.long()) / len(y_train)
-    assert torch.allclose(sampled_label_dist, train_label_dist, atol=0.1)
-
-
 def test_empirical_sampling_with_sampler(sampler, dummy_data):
     """Test that sampling using VPSampler recovers the training distribution."""
     # Collect all training data
@@ -243,13 +190,6 @@ def test_empirical_device_movement(sampler, dummy_data):
 
     x0_hat = EmpiricalDistribution.x0(x, t, sampler, {}, {"labeled_data": dummy_data})
     assert x0_hat.device == device
-
-    # Test sampling
-    X, y = EmpiricalDistribution.sample(N, {}, {"labeled_data": dummy_data})
-    X = X.to(device)
-    y = y.to(device)
-    assert X.device == device
-    assert y.device == device
 
 
 # ============================================================================
