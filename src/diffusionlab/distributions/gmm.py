@@ -27,7 +27,9 @@ class GMMDistribution(Distribution):
     """
 
     @classmethod
-    def validate_params(cls, possibly_batched_dist_params: Dict[str, torch.Tensor]) -> None:
+    def validate_params(
+        cls, possibly_batched_dist_params: Dict[str, torch.Tensor]
+    ) -> None:
         assert (
             "means" in possibly_batched_dist_params
             and "covs" in possibly_batched_dist_params
@@ -64,7 +66,9 @@ class GMMDistribution(Distribution):
         assert torch.allclose(sum_priors, torch.ones_like(sum_priors))
 
         evals = torch.linalg.eigvalsh(covs)
-        assert torch.all(evals >= -D * torch.finfo(evals.dtype).eps)  # Allow for numerical errors
+        assert torch.all(
+            evals >= -D * torch.finfo(evals.dtype).eps
+        )  # Allow for numerical errors
 
     @classmethod
     def x0(
@@ -90,9 +94,13 @@ class GMMDistribution(Distribution):
         centered_x = xt[:, None, :] - alpha[:, None, None] * means  # (N, K, D)
         covs_t_inv_centered_x = vector_lstsq(covs_t, centered_x)  # (N, K, D)
 
-        mahalanobis_dists = torch.sum(centered_x * covs_t_inv_centered_x, dim=-1)  # (N, K)
+        mahalanobis_dists = torch.sum(
+            centered_x * covs_t_inv_centered_x, dim=-1
+        )  # (N, K)
         logdets_covs_t = logdet_pd(covs_t)  # (N, K)
-        w = torch.log(priors) - 1 / 2 * logdets_covs_t - 1 / 2 * mahalanobis_dists  # (N, K)
+        w = (
+            torch.log(priors) - 1 / 2 * logdets_covs_t - 1 / 2 * mahalanobis_dists
+        )  # (N, K)
         softmax_w = torch.softmax(w, dim=-1)  # (N, K)
 
         weighted_normalized_x = torch.sum(
@@ -149,7 +157,9 @@ class IsoGMMDistribution(Distribution):
     """
 
     @classmethod
-    def validate_params(cls, possibly_batched_dist_params: Dict[str, torch.Tensor]) -> None:
+    def validate_params(
+        cls, possibly_batched_dist_params: Dict[str, torch.Tensor]
+    ) -> None:
         assert (
             "means" in possibly_batched_dist_params
             and "vars" in possibly_batched_dist_params
@@ -175,7 +185,9 @@ class IsoGMMDistribution(Distribution):
         priors_sum = torch.sum(priors, dim=-1)
         assert torch.all(priors_sum >= 0)
         assert torch.allclose(priors_sum, torch.ones_like(priors_sum))
-        assert torch.all(vars_ >= -D * torch.finfo(vars_.dtype).eps)  # Allow for numerical errors
+        assert torch.all(
+            vars_ >= -D * torch.finfo(vars_.dtype).eps
+        )  # Allow for numerical errors
 
     @classmethod
     def x0(
@@ -199,8 +211,12 @@ class IsoGMMDistribution(Distribution):
         centered_x = xt[:, None, :] - alpha[:, None, None] * means  # (N, K, D)
         vars_t_inv_centered_x = centered_x / vars_t[:, :, None]  # (N, K, D)
 
-        mahalanobis_dists = torch.sum(centered_x * vars_t_inv_centered_x, dim=-1)  # (N, K)
-        w = torch.log(priors) - D / 2 * torch.log(vars_t) - 1 / 2 * mahalanobis_dists  # (N, K)
+        mahalanobis_dists = torch.sum(
+            centered_x * vars_t_inv_centered_x, dim=-1
+        )  # (N, K)
+        w = (
+            torch.log(priors) - D / 2 * torch.log(vars_t) - 1 / 2 * mahalanobis_dists
+        )  # (N, K)
         softmax_w = torch.softmax(w, dim=-1)  # (N, K)
 
         weighted_normalized_x = torch.sum(
@@ -225,9 +241,12 @@ class IsoGMMDistribution(Distribution):
 
         K, D = means.shape
         covs = (
-            torch.eye(D, device=vars_.device)[None, :, :].expand(K, -1, -1) * vars_[:, None, None]
+            torch.eye(D, device=vars_.device)[None, :, :].expand(K, -1, -1)
+            * vars_[:, None, None]
         )
-        return GMMDistribution.sample(N, {"means": means, "covs": covs, "priors": priors}, dict())
+        return GMMDistribution.sample(
+            N, {"means": means, "covs": covs, "priors": priors}, dict()
+        )
 
 
 class IsoHomoGMMDistribution(Distribution):
@@ -250,7 +269,9 @@ class IsoHomoGMMDistribution(Distribution):
     """
 
     @classmethod
-    def validate_params(cls, possibly_batched_dist_params: Dict[str, torch.Tensor]) -> None:
+    def validate_params(
+        cls, possibly_batched_dist_params: Dict[str, torch.Tensor]
+    ) -> None:
         assert (
             "means" in possibly_batched_dist_params
             and "var" in possibly_batched_dist_params
@@ -276,7 +297,9 @@ class IsoHomoGMMDistribution(Distribution):
         priors_sum = torch.sum(priors, dim=-1)
         assert torch.all(priors_sum >= 0)
         assert torch.allclose(priors_sum, torch.ones_like(priors_sum))
-        assert torch.all(var >= -D * torch.finfo(var.dtype).eps)  # Allow for numerical errors
+        assert torch.all(
+            var >= -D * torch.finfo(var.dtype).eps
+        )  # Allow for numerical errors
 
     @classmethod
     def x0(
@@ -300,7 +323,9 @@ class IsoHomoGMMDistribution(Distribution):
         centered_x = xt[:, None, :] - alpha[:, None, None] * means  # (N, K, D)
         vars_t_inv_centered_x = centered_x / var_t[:, None, None]  # (N, K, D)
 
-        mahalanobis_dists = torch.sum(centered_x * vars_t_inv_centered_x, dim=-1)  # (N, K)
+        mahalanobis_dists = torch.sum(
+            centered_x * vars_t_inv_centered_x, dim=-1
+        )  # (N, K)
         w = torch.log(priors) - 1 / 2 * mahalanobis_dists  # (N, K)
         softmax_w = torch.softmax(w, dim=-1)  # (N, K)
 
@@ -326,7 +351,9 @@ class IsoHomoGMMDistribution(Distribution):
 
         K, D = means.shape
         covs = torch.eye(D, device=var.device)[None, :, :].expand(K, -1, -1) * var
-        return GMMDistribution.sample(N, {"means": means, "covs": covs, "priors": priors}, dict())
+        return GMMDistribution.sample(
+            N, {"means": means, "covs": covs, "priors": priors}, dict()
+        )
 
 
 class LowRankGMMDistribution(Distribution):
@@ -355,7 +382,9 @@ class LowRankGMMDistribution(Distribution):
     """
 
     @classmethod
-    def validate_params(cls, possibly_batched_dist_params: Dict[str, torch.Tensor]) -> None:
+    def validate_params(
+        cls, possibly_batched_dist_params: Dict[str, torch.Tensor]
+    ) -> None:
         assert (
             "means" in possibly_batched_dist_params
             and "covs_factors" in possibly_batched_dist_params
@@ -377,11 +406,7 @@ class LowRankGMMDistribution(Distribution):
         assert len(priors.shape) == 2
 
         N, K, D, P = covs_factors.shape
-        assert (
-            means.shape[0] == N
-            and means.shape[1] == K
-            and means.shape[2] == D
-        )
+        assert means.shape[0] == N and means.shape[1] == K and means.shape[2] == D
         assert len(priors.shape) == 2 and priors.shape[0] == N and priors.shape[1] == K
         assert means.device == covs_factors.device == priors.device
 
@@ -424,14 +449,20 @@ class LowRankGMMDistribution(Distribution):
                 @ torch.linalg.lstsq(  # (N, K, P, 1)
                     internal_covs  # (N, K, P, P)
                     + sigma_alpha_ratio_sq[:, None, None, None]  # (N, K, 1, 1)
-                    * torch.eye(P, device=internal_covs.device)[None, None, :, :],  # (1, 1, P, P)
+                    * torch.eye(P, device=internal_covs.device)[
+                        None, None, :, :
+                    ],  # (1, 1, P, P)
                     covs_factors_T @ centered_x[:, :, :, None],  # (N, K, P, 1)
                 ).solution
             )[:, :, :, 0]  # (N, K, D)
         )  # (N, K, D)
 
-        mahalanobis_dists = torch.sum(centered_x * covs_t_inv_centered_x, dim=-1)  # (N, K)
-        w = torch.log(priors) - 1 / 2 * logdets_covs_t - 1 / 2 * mahalanobis_dists  # (N, K)
+        mahalanobis_dists = torch.sum(
+            centered_x * covs_t_inv_centered_x, dim=-1
+        )  # (N, K)
+        w = (
+            torch.log(priors) - 1 / 2 * logdets_covs_t - 1 / 2 * mahalanobis_dists
+        )  # (N, K)
         softmax_w = torch.softmax(w, dim=-1)  # (N, K)
 
         weighted_normalized_x = torch.sum(

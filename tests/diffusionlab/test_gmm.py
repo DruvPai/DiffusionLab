@@ -1,10 +1,10 @@
 import pytest
 import torch
 from diffusionlab.distributions.gmm import (
-    GMMDistribution, 
-    IsoHomoGMMDistribution, 
+    GMMDistribution,
+    IsoHomoGMMDistribution,
     IsoGMMDistribution,
-    LowRankGMMDistribution
+    LowRankGMMDistribution,
 )
 from diffusionlab.samplers import VPSampler
 
@@ -12,10 +12,12 @@ from diffusionlab.samplers import VPSampler
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def sampler():
     """Create a VP sampler for testing."""
     return VPSampler(is_stochastic=False, t_min=0.01, t_max=0.99, L=100)
+
 
 @pytest.fixture
 def sampling_gmm_params():
@@ -39,6 +41,7 @@ def sampling_gmm_params():
         "priors": priors,  # (K,)
     }
 
+
 @pytest.fixture
 def sampling_iso_gmm_params(sampling_gmm_params):
     """Create non-batched isotropic GMM parameters for sampling."""
@@ -50,6 +53,7 @@ def sampling_iso_gmm_params(sampling_gmm_params):
         "vars": vars,  # (K,)
         "priors": priors,  # (K,)
     }
+
 
 @pytest.fixture
 def denoising_iso_gmm_params(sampling_iso_gmm_params):
@@ -67,7 +71,10 @@ def denoising_iso_gmm_params(sampling_iso_gmm_params):
     vars = sampling_iso_gmm_params["vars"][None, ...].expand(N, -1) * var_scales
 
     # Create batch of priors by perturbing and renormalizing
-    priors_logits = torch.log(sampling_iso_gmm_params["priors"])[None, ...].expand(N, -1) + torch.randn(N, K) * 0.2
+    priors_logits = (
+        torch.log(sampling_iso_gmm_params["priors"])[None, ...].expand(N, -1)
+        + torch.randn(N, K) * 0.2
+    )
     priors = torch.softmax(priors_logits, dim=-1)
 
     return {
@@ -75,6 +82,7 @@ def denoising_iso_gmm_params(sampling_iso_gmm_params):
         "vars": vars,  # (N, K)
         "priors": priors,  # (N, K)
     }
+
 
 @pytest.fixture
 def denoising_gmm_params(sampling_gmm_params):
@@ -89,10 +97,16 @@ def denoising_gmm_params(sampling_gmm_params):
 
     # Create batch of covariances by scaling the base covariances
     cov_scales = torch.exp(torch.randn(N, K) * 0.2)  # Random positive scales
-    covs = sampling_gmm_params["covs"][None, ...].expand(N, -1, -1, -1) * cov_scales[..., None, None]
+    covs = (
+        sampling_gmm_params["covs"][None, ...].expand(N, -1, -1, -1)
+        * cov_scales[..., None, None]
+    )
 
     # Create batch of priors by perturbing and renormalizing
-    priors_logits = torch.log(sampling_gmm_params["priors"])[None, ...].expand(N, -1) + torch.randn(N, K) * 0.2
+    priors_logits = (
+        torch.log(sampling_gmm_params["priors"])[None, ...].expand(N, -1)
+        + torch.randn(N, K) * 0.2
+    )
     priors = torch.softmax(priors_logits, dim=-1)
 
     return {
@@ -100,6 +114,7 @@ def denoising_gmm_params(sampling_gmm_params):
         "covs": covs,  # (N, K, D, D)
         "priors": priors,  # (N, K)
     }
+
 
 @pytest.fixture
 def sampling_iso_homo_gmm_params(sampling_gmm_params):
@@ -113,6 +128,7 @@ def sampling_iso_homo_gmm_params(sampling_gmm_params):
         "priors": priors,  # (K,)
     }
 
+
 @pytest.fixture
 def denoising_iso_homo_gmm_params(sampling_iso_homo_gmm_params):
     """Create batched isotropic homogeneous GMM parameters for denoising."""
@@ -122,14 +138,20 @@ def denoising_iso_homo_gmm_params(sampling_iso_homo_gmm_params):
 
     # Create batch of means by adding random offsets
     means_offset = torch.randn(N, K, D) * 0.2
-    means = sampling_iso_homo_gmm_params["means"][None, ...].expand(N, -1, -1) + means_offset
+    means = (
+        sampling_iso_homo_gmm_params["means"][None, ...].expand(N, -1, -1)
+        + means_offset
+    )
 
     # Create batch of variances by scaling the base variance
     var_scales = torch.exp(torch.randn(N) * 0.2)  # Random positive scales
     var = sampling_iso_homo_gmm_params["var"] * var_scales
 
     # Create batch of priors by perturbing and renormalizing
-    priors_logits = torch.log(sampling_iso_homo_gmm_params["priors"])[None, ...].expand(N, -1) + torch.randn(N, K) * 0.2
+    priors_logits = (
+        torch.log(sampling_iso_homo_gmm_params["priors"])[None, ...].expand(N, -1)
+        + torch.randn(N, K) * 0.2
+    )
     priors = torch.softmax(priors_logits, dim=-1)
 
     return {
@@ -138,20 +160,22 @@ def denoising_iso_homo_gmm_params(sampling_iso_homo_gmm_params):
         "priors": priors,  # (N, K)
     }
 
+
 @pytest.fixture
 def sampling_low_rank_gmm_params():
     """Create non-batched low-rank GMM parameters for sampling."""
     D = 2  # dimension
-    P = 1  # rank
     device = torch.device("cpu")
 
     means = torch.tensor([[1.0, 1.0], [-1.0, -1.0], [1.0, -1.0]], device=device)
     # Create low-rank factors that would result in diagonal covariances
-    covs_factors = torch.stack([
-        torch.tensor([[0.3162]], device=device).expand(1, D).T,  # sqrt(0.1)
-        torch.tensor([[0.4472]], device=device).expand(1, D).T,  # sqrt(0.2)
-        torch.tensor([[0.5477]], device=device).expand(1, D).T,  # sqrt(0.3)
-    ])  # (K, D, R)
+    covs_factors = torch.stack(
+        [
+            torch.tensor([[0.3162]], device=device).expand(1, D).T,  # sqrt(0.1)
+            torch.tensor([[0.4472]], device=device).expand(1, D).T,  # sqrt(0.2)
+            torch.tensor([[0.5477]], device=device).expand(1, D).T,  # sqrt(0.3)
+        ]
+    )  # (K, D, R)
     priors = torch.tensor([0.3, 0.3, 0.4], device=device)
 
     return {
@@ -160,24 +184,35 @@ def sampling_low_rank_gmm_params():
         "priors": priors,  # (K,)
     }
 
+
 @pytest.fixture
 def denoising_low_rank_gmm_params(sampling_low_rank_gmm_params):
     """Create batched low-rank GMM parameters for denoising."""
     N = 10  # batch size
     K = sampling_low_rank_gmm_params["means"].shape[0]
     D = sampling_low_rank_gmm_params["means"].shape[1]
-    P = sampling_low_rank_gmm_params["covs_factors"].shape[-1]
 
     # Create batch of means by adding random offsets
     means_offset = torch.randn(N, K, D) * 0.2
-    means = sampling_low_rank_gmm_params["means"][None, ...].expand(N, -1, -1) + means_offset
+    means = (
+        sampling_low_rank_gmm_params["means"][None, ...].expand(N, -1, -1)
+        + means_offset
+    )
 
     # Create batch of factors by scaling the base factors
-    covs_factors_scales = torch.exp(torch.randn(N, K) * 0.2)[:, :, None, None]  # Random positive scales
-    covs_factors = sampling_low_rank_gmm_params["covs_factors"][None, ...].expand(N, -1, -1, -1) * covs_factors_scales
+    covs_factors_scales = torch.exp(torch.randn(N, K) * 0.2)[
+        :, :, None, None
+    ]  # Random positive scales
+    covs_factors = (
+        sampling_low_rank_gmm_params["covs_factors"][None, ...].expand(N, -1, -1, -1)
+        * covs_factors_scales
+    )
 
     # Create batch of priors by perturbing and renormalizing
-    priors_logits = torch.log(sampling_low_rank_gmm_params["priors"])[None, ...].expand(N, -1) + torch.randn(N, K) * 0.2
+    priors_logits = (
+        torch.log(sampling_low_rank_gmm_params["priors"])[None, ...].expand(N, -1)
+        + torch.randn(N, K) * 0.2
+    )
     priors = torch.softmax(priors_logits, dim=-1)
 
     return {
@@ -186,16 +221,17 @@ def denoising_low_rank_gmm_params(sampling_low_rank_gmm_params):
         "priors": priors,  # (N, K)
     }
 
+
 # ============================================================================
 # Validation Tests
 # ============================================================================
+
 
 def test_gmm_validation():
     """Test validation of parameters for GMM distribution."""
     D = 2
     K = 3
     N = 3
-    device = torch.device("cpu")
 
     # Test valid sampling parameters (non-batched)
     sampling_params = {
@@ -215,7 +251,9 @@ def test_gmm_validation():
 
     # Test error cases
     with pytest.raises(AssertionError):
-        GMMDistribution.validate_params({"means": torch.randn(K, D)})  # Missing parameters
+        GMMDistribution.validate_params(
+            {"means": torch.randn(K, D)}
+        )  # Missing parameters
 
     invalid_params = sampling_params.copy()
     invalid_params["covs"] = torch.stack([torch.eye(3)] * K)  # Wrong dimension
@@ -228,10 +266,13 @@ def test_gmm_validation():
         GMMDistribution.validate_params(invalid_params)
 
     invalid_params = denoising_params.copy()
-    invalid_covs = torch.tensor([[1.0, 2.0], [2.0, 1.0]])[None, None].expand(N, K, -1, -1)
+    invalid_covs = torch.tensor([[1.0, 2.0], [2.0, 1.0]])[None, None].expand(
+        N, K, -1, -1
+    )
     invalid_params["covs"] = invalid_covs  # Non-positive definite
     with pytest.raises(AssertionError):
         GMMDistribution.validate_params(invalid_params)
+
 
 def test_iso_homo_gmm_validation():
     """Test validation of parameters for isotropic homogeneous GMM."""
@@ -257,7 +298,9 @@ def test_iso_homo_gmm_validation():
 
     # Test error cases
     with pytest.raises(AssertionError):
-        IsoHomoGMMDistribution.validate_params({"means": torch.randn(K, D)})  # Missing parameters
+        IsoHomoGMMDistribution.validate_params(
+            {"means": torch.randn(K, D)}
+        )  # Missing parameters
 
     invalid_params = sampling_params.copy()
     invalid_params["var"] = torch.tensor(-1.0)  # Negative variance
@@ -268,6 +311,7 @@ def test_iso_homo_gmm_validation():
     invalid_params["priors"] = torch.ones(N, K)  # Not normalized
     with pytest.raises(AssertionError):
         IsoHomoGMMDistribution.validate_params(invalid_params)
+
 
 def test_iso_gmm_validation():
     """Test validation of parameters for isotropic GMM."""
@@ -293,7 +337,9 @@ def test_iso_gmm_validation():
 
     # Test error cases
     with pytest.raises(AssertionError):
-        IsoGMMDistribution.validate_params({"means": torch.randn(K, D)})  # Missing parameters
+        IsoGMMDistribution.validate_params(
+            {"means": torch.randn(K, D)}
+        )  # Missing parameters
 
     invalid_params = sampling_params.copy()
     invalid_params["vars"] = torch.tensor([-1.0] * K)  # Negative variances
@@ -304,6 +350,7 @@ def test_iso_gmm_validation():
     invalid_params["priors"] = torch.ones(N, K)  # Not normalized
     with pytest.raises(AssertionError):
         IsoGMMDistribution.validate_params(invalid_params)
+
 
 def test_low_rank_gmm_validation():
     """Test validation of parameters for low-rank GMM."""
@@ -330,7 +377,9 @@ def test_low_rank_gmm_validation():
 
     # Test error cases
     with pytest.raises(AssertionError):
-        LowRankGMMDistribution.validate_params({"means": torch.randn(K, D)})  # Missing parameters
+        LowRankGMMDistribution.validate_params(
+            {"means": torch.randn(K, D)}
+        )  # Missing parameters
 
     invalid_params = sampling_params.copy()
     invalid_params["covs_factors"] = torch.randn(K, D + 1, R)  # Wrong dimension
@@ -342,9 +391,11 @@ def test_low_rank_gmm_validation():
     with pytest.raises(AssertionError):
         LowRankGMMDistribution.validate_params(invalid_params)
 
+
 # ============================================================================
 # Sampling Tests
 # ============================================================================
+
 
 def test_gmm_sampling(sampling_gmm_params):
     """Test sampling from GMM distribution."""
@@ -369,10 +420,19 @@ def test_gmm_sampling(sampling_gmm_params):
             component_samples = X[mask]
             mean = component_samples.mean(0)
             cov = torch.cov(component_samples.T)
-            
+
             # Check statistics
-            assert torch.norm(mean - sampling_gmm_params["means"][k]) / torch.norm(sampling_gmm_params["means"][k]) < 0.5
-            assert torch.norm(cov - sampling_gmm_params["covs"][k]) / torch.norm(sampling_gmm_params["covs"][k]) < 0.5
+            assert (
+                torch.norm(mean - sampling_gmm_params["means"][k])
+                / torch.norm(sampling_gmm_params["means"][k])
+                < 0.5
+            )
+            assert (
+                torch.norm(cov - sampling_gmm_params["covs"][k])
+                / torch.norm(sampling_gmm_params["covs"][k])
+                < 0.5
+            )
+
 
 def test_iso_homo_gmm_sampling(sampling_iso_homo_gmm_params):
     """Test sampling from isotropic homogeneous GMM."""
@@ -397,11 +457,14 @@ def test_iso_homo_gmm_sampling(sampling_iso_homo_gmm_params):
             component_samples = X[mask]
             mean = component_samples.mean(0)
             cov = torch.cov(component_samples.T)
-            
+
             # Check statistics
-            assert torch.allclose(mean, sampling_iso_homo_gmm_params["means"][k], atol=0.5)
+            assert torch.allclose(
+                mean, sampling_iso_homo_gmm_params["means"][k], atol=0.5
+            )
             expected_cov = torch.eye(2) * sampling_iso_homo_gmm_params["var"]
             assert torch.allclose(cov, expected_cov, atol=0.5)
+
 
 def test_iso_gmm_sampling(sampling_iso_gmm_params):
     """Test sampling from isotropic GMM."""
@@ -426,11 +489,12 @@ def test_iso_gmm_sampling(sampling_iso_gmm_params):
             component_samples = X[mask]
             mean = component_samples.mean(0)
             cov = torch.cov(component_samples.T)
-            
+
             # Check statistics
             assert torch.allclose(mean, sampling_iso_gmm_params["means"][k], atol=0.5)
             expected_cov = torch.eye(2) * sampling_iso_gmm_params["vars"][k]
             assert torch.allclose(cov, expected_cov, atol=0.5)
+
 
 def test_low_rank_gmm_sampling(sampling_low_rank_gmm_params):
     """Test sampling from low-rank GMM."""
@@ -455,12 +519,15 @@ def test_low_rank_gmm_sampling(sampling_low_rank_gmm_params):
             component_samples = X[mask]
             mean = component_samples.mean(0)
             cov = torch.cov(component_samples.T)
-            
+
             # Check statistics
-            assert torch.allclose(mean, sampling_low_rank_gmm_params["means"][k], atol=0.5)
+            assert torch.allclose(
+                mean, sampling_low_rank_gmm_params["means"][k], atol=0.5
+            )
             covs_factors = sampling_low_rank_gmm_params["covs_factors"][k]  # (D, P)
             expected_cov = covs_factors @ covs_factors.T
             assert torch.allclose(cov, expected_cov, atol=0.5)
+
 
 def test_low_rank_gmm_equals_full_gmm():
     """Test that LowRankGMMDistribution equals GMMDistribution when covariances are low-rank."""
@@ -468,11 +535,13 @@ def test_low_rank_gmm_equals_full_gmm():
     K = 3  # number of components
     D = 2  # dimension
     R = 1  # rank
-    
+
     # Create parameters that would result in the same distribution
     means = torch.randn(N, K, D)
     covs_factors = torch.randn(N, K, D, R)  # Low-rank factors
-    covs = covs_factors @ covs_factors.transpose(-1, -2)  # Construct full covariance from factors
+    covs = covs_factors @ covs_factors.transpose(
+        -1, -2
+    )  # Construct full covariance from factors
     priors = torch.softmax(torch.randn(N, K), dim=-1)
 
     low_rank_params = {
@@ -512,9 +581,11 @@ def test_low_rank_gmm_equals_full_gmm():
     score_full = GMMDistribution.score(x, t, sampler, full_params, {})
     assert torch.allclose(score_low_rank, score_full, atol=1e-5)
 
+
 # ============================================================================
 # Vector Field Tests
 # ============================================================================
+
 
 def test_gmm_x0_shape(sampler, denoising_gmm_params):
     """Test x0 prediction shape for GMM."""
@@ -526,6 +597,7 @@ def test_gmm_x0_shape(sampler, denoising_gmm_params):
     x0_hat = GMMDistribution.x0(x, t, sampler, denoising_gmm_params, {})
     assert x0_hat.shape == (N, D)
 
+
 def test_iso_homo_gmm_x0_shape(sampler, denoising_iso_homo_gmm_params):
     """Test x0 prediction shape for isotropic homogeneous GMM."""
     N = 10
@@ -535,6 +607,7 @@ def test_iso_homo_gmm_x0_shape(sampler, denoising_iso_homo_gmm_params):
 
     x0_hat = IsoHomoGMMDistribution.x0(x, t, sampler, denoising_iso_homo_gmm_params, {})
     assert x0_hat.shape == (N, D)
+
 
 def test_gmm_vector_field_types(sampler, denoising_gmm_params):
     """Test all vector field types work correctly for GMM."""
@@ -559,6 +632,7 @@ def test_gmm_vector_field_types(sampler, denoising_gmm_params):
     x_from_x0 = sampler.alpha(t)[:, None] * x0_hat + sampler.sigma(t)[:, None] * eps_hat
     assert torch.allclose(x, x_from_x0, rtol=1e-5)
 
+
 def test_iso_homo_gmm_vector_field_types(sampler, denoising_iso_homo_gmm_params):
     """Test all vector field types work correctly for isotropic homogeneous GMM."""
     N = 10
@@ -568,9 +642,13 @@ def test_iso_homo_gmm_vector_field_types(sampler, denoising_iso_homo_gmm_params)
 
     # Test each vector field type
     x0_hat = IsoHomoGMMDistribution.x0(x, t, sampler, denoising_iso_homo_gmm_params, {})
-    eps_hat = IsoHomoGMMDistribution.eps(x, t, sampler, denoising_iso_homo_gmm_params, {})
+    eps_hat = IsoHomoGMMDistribution.eps(
+        x, t, sampler, denoising_iso_homo_gmm_params, {}
+    )
     v_hat = IsoHomoGMMDistribution.v(x, t, sampler, denoising_iso_homo_gmm_params, {})
-    score_hat = IsoHomoGMMDistribution.score(x, t, sampler, denoising_iso_homo_gmm_params, {})
+    score_hat = IsoHomoGMMDistribution.score(
+        x, t, sampler, denoising_iso_homo_gmm_params, {}
+    )
 
     # Check shapes
     assert x0_hat.shape == (N, D)
@@ -582,6 +660,7 @@ def test_iso_homo_gmm_vector_field_types(sampler, denoising_iso_homo_gmm_params)
     x_from_x0 = sampler.alpha(t)[:, None] * x0_hat + sampler.sigma(t)[:, None] * eps_hat
     assert torch.allclose(x, x_from_x0, rtol=1e-5)
 
+
 def test_iso_gmm_x0_shape(sampler, denoising_iso_gmm_params):
     """Test x0 prediction shape for isotropic GMM."""
     N = 10
@@ -591,6 +670,7 @@ def test_iso_gmm_x0_shape(sampler, denoising_iso_gmm_params):
 
     x0_hat = IsoGMMDistribution.x0(x, t, sampler, denoising_iso_gmm_params, {})
     assert x0_hat.shape == (N, D)
+
 
 def test_iso_gmm_vector_field_types(sampler, denoising_iso_gmm_params):
     """Test all vector field types work correctly for isotropic GMM."""
@@ -615,6 +695,7 @@ def test_iso_gmm_vector_field_types(sampler, denoising_iso_gmm_params):
     x_from_x0 = sampler.alpha(t)[:, None] * x0_hat + sampler.sigma(t)[:, None] * eps_hat
     assert torch.allclose(x, x_from_x0, rtol=1e-5)
 
+
 def test_low_rank_gmm_x0_shape(sampler, denoising_low_rank_gmm_params):
     """Test x0 prediction shape for low-rank GMM."""
     N = 10
@@ -625,6 +706,7 @@ def test_low_rank_gmm_x0_shape(sampler, denoising_low_rank_gmm_params):
     x0_hat = LowRankGMMDistribution.x0(x, t, sampler, denoising_low_rank_gmm_params, {})
     assert x0_hat.shape == (N, D)
 
+
 def test_low_rank_gmm_vector_field_types(sampler, denoising_low_rank_gmm_params):
     """Test all vector field types work correctly for low-rank GMM."""
     N = 10
@@ -634,9 +716,13 @@ def test_low_rank_gmm_vector_field_types(sampler, denoising_low_rank_gmm_params)
 
     # Test each vector field type
     x0_hat = LowRankGMMDistribution.x0(x, t, sampler, denoising_low_rank_gmm_params, {})
-    eps_hat = LowRankGMMDistribution.eps(x, t, sampler, denoising_low_rank_gmm_params, {})
+    eps_hat = LowRankGMMDistribution.eps(
+        x, t, sampler, denoising_low_rank_gmm_params, {}
+    )
     v_hat = LowRankGMMDistribution.v(x, t, sampler, denoising_low_rank_gmm_params, {})
-    score_hat = LowRankGMMDistribution.score(x, t, sampler, denoising_low_rank_gmm_params, {})
+    score_hat = LowRankGMMDistribution.score(
+        x, t, sampler, denoising_low_rank_gmm_params, {}
+    )
 
     # Check shapes
     assert x0_hat.shape == (N, D)
@@ -648,9 +734,11 @@ def test_low_rank_gmm_vector_field_types(sampler, denoising_low_rank_gmm_params)
     x_from_x0 = sampler.alpha(t)[:, None] * x0_hat + sampler.sigma(t)[:, None] * eps_hat
     assert torch.allclose(x, x_from_x0, rtol=1e-5)
 
+
 # ============================================================================
 # Device Tests
 # ============================================================================
+
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
 def test_gmm_device_movement(sampler, sampling_gmm_params, denoising_gmm_params):
@@ -673,20 +761,27 @@ def test_gmm_device_movement(sampler, sampling_gmm_params, denoising_gmm_params)
     x0_hat = GMMDistribution.x0(x, t, sampler, cuda_denoising_params, {})
     assert x0_hat.device == device
 
+
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
-def test_iso_homo_gmm_device_movement(sampler, sampling_iso_homo_gmm_params, denoising_iso_homo_gmm_params):
+def test_iso_homo_gmm_device_movement(
+    sampler, sampling_iso_homo_gmm_params, denoising_iso_homo_gmm_params
+):
     """Test isotropic homogeneous GMM distribution works with different devices."""
     device = torch.device("cuda:0")
 
     # Test sampling
-    cuda_sampling_params = {k: v.to(device) for k, v in sampling_iso_homo_gmm_params.items()}
+    cuda_sampling_params = {
+        k: v.to(device) for k, v in sampling_iso_homo_gmm_params.items()
+    }
     N = 10
     X, y = IsoHomoGMMDistribution.sample(N, cuda_sampling_params, {})
     assert X.device == device
     assert y.device == device
 
     # Test denoising
-    cuda_denoising_params = {k: v.to(device) for k, v in denoising_iso_homo_gmm_params.items()}
+    cuda_denoising_params = {
+        k: v.to(device) for k, v in denoising_iso_homo_gmm_params.items()
+    }
     D = denoising_iso_homo_gmm_params["means"].shape[-1]
     x = torch.randn(N, D, device=device)
     t = torch.ones(N, device=device) * 0.5
@@ -694,8 +789,11 @@ def test_iso_homo_gmm_device_movement(sampler, sampling_iso_homo_gmm_params, den
     x0_hat = IsoHomoGMMDistribution.x0(x, t, sampler, cuda_denoising_params, {})
     assert x0_hat.device == device
 
+
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
-def test_iso_gmm_device_movement(sampler, sampling_iso_gmm_params, denoising_iso_gmm_params):
+def test_iso_gmm_device_movement(
+    sampler, sampling_iso_gmm_params, denoising_iso_gmm_params
+):
     """Test isotropic GMM distribution works with different devices."""
     device = torch.device("cuda:0")
 
@@ -707,7 +805,9 @@ def test_iso_gmm_device_movement(sampler, sampling_iso_gmm_params, denoising_iso
     assert y.device == device
 
     # Test denoising
-    cuda_denoising_params = {k: v.to(device) for k, v in denoising_iso_gmm_params.items()}
+    cuda_denoising_params = {
+        k: v.to(device) for k, v in denoising_iso_gmm_params.items()
+    }
     D = denoising_iso_gmm_params["means"].shape[-1]
     x = torch.randn(N, D, device=device)
     t = torch.ones(N, device=device) * 0.5
@@ -715,20 +815,27 @@ def test_iso_gmm_device_movement(sampler, sampling_iso_gmm_params, denoising_iso
     x0_hat = IsoGMMDistribution.x0(x, t, sampler, cuda_denoising_params, {})
     assert x0_hat.device == device
 
+
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
-def test_low_rank_gmm_device_movement(sampler, sampling_low_rank_gmm_params, denoising_low_rank_gmm_params):
+def test_low_rank_gmm_device_movement(
+    sampler, sampling_low_rank_gmm_params, denoising_low_rank_gmm_params
+):
     """Test low-rank GMM distribution works with different devices."""
     device = torch.device("cuda:0")
 
     # Test sampling
-    cuda_sampling_params = {k: v.to(device) for k, v in sampling_low_rank_gmm_params.items()}
+    cuda_sampling_params = {
+        k: v.to(device) for k, v in sampling_low_rank_gmm_params.items()
+    }
     N = 10
     X, y = LowRankGMMDistribution.sample(N, cuda_sampling_params, {})
     assert X.device == device
     assert y.device == device
 
     # Test denoising
-    cuda_denoising_params = {k: v.to(device) for k, v in denoising_low_rank_gmm_params.items()}
+    cuda_denoising_params = {
+        k: v.to(device) for k, v in denoising_low_rank_gmm_params.items()
+    }
     D = denoising_low_rank_gmm_params["means"].shape[-1]
     x = torch.randn(N, D, device=device)
     t = torch.ones(N, device=device) * 0.5
@@ -736,9 +843,11 @@ def test_low_rank_gmm_device_movement(sampler, sampling_low_rank_gmm_params, den
     x0_hat = LowRankGMMDistribution.x0(x, t, sampler, cuda_denoising_params, {})
     assert x0_hat.device == device
 
+
 # ============================================================================
 # Numerical Stability Tests
 # ============================================================================
+
 
 def test_gmm_numerical_stability(sampler):
     """Test numerical stability in edge cases for GMM."""
@@ -770,6 +879,7 @@ def test_gmm_numerical_stability(sampler):
     assert not torch.any(torch.isinf(x0_hat))
     assert torch.all(torch.abs(x0_hat) < 100)
 
+
 def test_iso_homo_gmm_numerical_stability(sampler):
     """Test numerical stability in edge cases for isotropic homogeneous GMM."""
     means = torch.tensor([[0.0, 0.0], [1.0, 1.0]])
@@ -798,6 +908,7 @@ def test_iso_homo_gmm_numerical_stability(sampler):
     assert not torch.any(torch.isnan(x0_hat))
     assert not torch.any(torch.isinf(x0_hat))
     assert torch.all(torch.abs(x0_hat) < 100)
+
 
 def test_iso_gmm_numerical_stability(sampler):
     """Test numerical stability in edge cases for isotropic GMM."""
@@ -828,6 +939,7 @@ def test_iso_gmm_numerical_stability(sampler):
     assert not torch.any(torch.isnan(x0_hat))
     assert not torch.any(torch.isinf(x0_hat))
     assert torch.all(torch.abs(x0_hat) < 100)
+
 
 def test_low_rank_gmm_numerical_stability(sampler):
     """Test numerical stability in edge cases for low-rank GMM."""

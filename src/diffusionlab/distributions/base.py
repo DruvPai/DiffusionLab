@@ -30,7 +30,9 @@ class Distribution:
         assert len(dist_hparams) == 0
 
     @classmethod
-    def validate_params(cls, possibly_batched_dist_params: Dict[str, torch.Tensor]) -> None:
+    def validate_params(
+        cls, possibly_batched_dist_params: Dict[str, torch.Tensor]
+    ) -> None:
         """
         Validate the parameters for the distribution.
 

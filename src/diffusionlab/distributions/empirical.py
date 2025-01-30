@@ -18,7 +18,7 @@ class EmpiricalDistribution(Distribution):
     where x_i is the ith data point in the dataset, and N is the number of data points.
 
     Distribution Parameters:
-        - None 
+        - None
 
     Distribution Hyperparameters:
         - labeled_data: A DataLoader of data which spawns the empirical distribution, where each data sample is a (data, label) tuple. Both data and label are PyTorch tensors.
