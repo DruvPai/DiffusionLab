@@ -16,28 +16,31 @@ class EmpiricalDistribution(Distribution):
     mu(B) = (1/N) * sum_(i=1)^(N) delta(x_i in B)
 
     where x_i is the ith data point in the dataset, and N is the number of data points.
+
+    Distribution Parameters:
+        - None 
+
+    Distribution Hyperparameters:
+        - labeled_data: A DataLoader of data which spawns the empirical distribution, where each data sample is a (data, label) tuple. Both data and label are PyTorch tensors.
     """
 
-    def __init__(self, sampler: Sampler, labeled_data: DataLoader):
-        super().__init__(sampler, {"labeled_data": labeled_data})
-        self.labeled_data: DataLoader = labeled_data
-
     @classmethod
-    def validate_params(cls, dist_params: Dict[str, Any]) -> None:
-        assert "labeled_data" in dist_params
-        labeled_data = dist_params["labeled_data"]
+    def validate_hparams(cls, dist_hparams: Dict[str, Any]) -> None:
+        assert "labeled_data" in dist_hparams
+        labeled_data = dist_hparams["labeled_data"]
         assert isinstance(labeled_data, DataLoader)
         assert len(labeled_data) > 0
 
     @classmethod
-    def stateless_x0(
+    def x0(
         cls,
-        sampler: Sampler,
-        dist_params: Dict[str, Any],
         xt: torch.Tensor,
         t: torch.Tensor,
+        sampler: Sampler,
+        batched_dist_params: Dict[str, torch.Tensor],
+        dist_hparams: Dict[str, Any],
     ) -> torch.Tensor:
-        data = dist_params["labeled_data"]
+        data = dist_hparams["labeled_data"]
 
         x_flattened = torch.flatten(xt, start_dim=1, end_dim=-1)  # (N, *D)
 
@@ -79,14 +82,19 @@ class EmpiricalDistribution(Distribution):
         x0_hat = x0_hat / pad_shape_back(softmax_denom, x0_hat.shape)  # (N, *D)
         return x0_hat
 
-    def sample(self, N: int) -> Tuple[torch.Tensor, Any]:
+    @classmethod
+    def sample(
+        cls,
+        N: int,
+        dist_params: Dict[str, torch.Tensor],
+        dist_hparams: Dict[str, Any],
+    ) -> Tuple[torch.Tensor, Any]:
         samples_X = []
         samples_y = []
-        device = self.sampler.schedule.device
         while len(samples_X) < N:
-            for X_batch, y_batch in self.labeled_data:
-                samples_X.append(X_batch.to(device, non_blocking=True))
-                samples_y.append(y_batch.to(device, non_blocking=True))
+            for X_batch, y_batch in dist_hparams["labeled_data"]:
+                samples_X.append(X_batch)
+                samples_y.append(y_batch)
                 if len(samples_X) >= N:
                     break
         X = torch.concatenate(samples_X)[:N]

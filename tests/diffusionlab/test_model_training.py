@@ -46,9 +46,10 @@ def dummy_dataset(dummy_sampler):
     priors = torch.rand(3)
     priors = priors / priors.sum()
     var = torch.tensor(0.5)
-    dist = IsoHomoGMMDistribution(dummy_sampler, means, var, priors)
-    X_train, y_train = dist.sample(100)
-    X_val, y_val = dist.sample(50)
+    dist_params = {"means": means, "var": var, "priors": priors}
+    dist_hparams = {}
+    X_train, y_train = IsoHomoGMMDistribution.sample(100, dist_params, dist_hparams)
+    X_val, y_val = IsoHomoGMMDistribution.sample(50, dist_params, dist_hparams)
     train_dataloader = DataLoader(
         TensorDataset(X_train, y_train), batch_size=10, shuffle=True
     )
