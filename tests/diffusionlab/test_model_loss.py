@@ -60,7 +60,8 @@ def model(dummy_net, dummy_sampler):
         scheduler=optim.lr_scheduler.StepLR(
             optim.Adam(dummy_net.parameters(), lr=1e-4), step_size=1
         ),
-        val_metrics={},
+        batchwise_val_metrics={},
+        overall_val_metrics={},
         t_loss_weights=t_loss_weights,
         t_loss_probs=t_loss_probs,
         N_noise_per_sample=2,
@@ -97,7 +98,8 @@ def test_model_forward():
         scheduler=optim.lr_scheduler.StepLR(
             optim.Adam(net.parameters(), lr=1e-4), step_size=1
         ),
-        val_metrics={},
+        batchwise_val_metrics={},
+        overall_val_metrics={},
         t_loss_weights=lambda t: torch.ones_like(t),
         t_loss_probs=lambda t: torch.ones_like(t) / len(t),
         N_noise_per_sample=2,
@@ -125,7 +127,8 @@ def test_model_loss():
         scheduler=optim.lr_scheduler.StepLR(
             optim.Adam(net.parameters(), lr=1e-4), step_size=1
         ),
-        val_metrics={},
+        batchwise_val_metrics={},
+        overall_val_metrics={},
         t_loss_weights=lambda t: torch.ones_like(t),
         t_loss_probs=lambda t: torch.ones_like(t) / len(t),
         N_noise_per_sample=2,
