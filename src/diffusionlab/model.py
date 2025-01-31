@@ -16,7 +16,8 @@ class DiffusionModel(LightningModule, VectorField):
         vector_field_type: VectorFieldType,
         optimizer: optim.Optimizer,
         scheduler: optim.lr_scheduler.LRScheduler,
-        val_metrics: Dict[str, nn.Module],
+        batchwise_val_metrics: Dict[str, nn.Module],
+        overall_val_metrics: Dict[str, nn.Module],
         t_loss_weights: Callable[[torch.Tensor], torch.Tensor],
         t_loss_probs: Callable[[torch.Tensor], torch.Tensor],
         N_noise_per_sample: int,
@@ -27,7 +28,8 @@ class DiffusionModel(LightningModule, VectorField):
         self.sampler: Sampler = sampler
         self.optimizer: optim.Optimizer = optimizer
         self.scheduler: optim.lr_scheduler.LRScheduler = scheduler
-        self.val_metrics: Dict[str, nn.Module] = val_metrics
+        self.batchwise_val_metrics: Dict[str, nn.Module] = batchwise_val_metrics
+        self.overall_val_metrics: Dict[str, nn.Module] = overall_val_metrics
 
         self.t_loss_weights: Callable[[torch.Tensor], torch.Tensor] = t_loss_weights
         self.t_loss_probs: Callable[[torch.Tensor], torch.Tensor] = t_loss_probs
@@ -95,8 +97,15 @@ class DiffusionModel(LightningModule, VectorField):
         loss = self.aggregate_loss(x)
         metric_values = {
             metric_name: metric(x, metadata, self)
-            for metric_name, metric in self.val_metrics.items()
+            for metric_name, metric in self.batchwise_val_metrics.items()
         }
         metric_values["val_loss"] = loss
         self.log_dict(metric_values, on_step=True, on_epoch=True, prog_bar=True)
         return metric_values
+
+    def on_validation_epoch_end(self) -> None:
+        metric_values = {
+            metric_name: metric(self)
+            for metric_name, metric in self.overall_val_metrics.items()
+        }
+        self.log_dict(metric_values, on_step=False, on_epoch=True, prog_bar=True)
