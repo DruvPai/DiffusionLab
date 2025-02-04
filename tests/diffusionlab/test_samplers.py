@@ -1,6 +1,6 @@
 import torch
 import pytest
-from diffusionlab.samplers import Sampler, VESampler, VPSampler, FMSampler
+from diffusionlab.sampler import Sampler, VESampler, VPSampler, FMSampler
 from diffusionlab.vector_fields import VectorField, VectorFieldType
 
 
@@ -8,22 +8,24 @@ def test_sampler_initialization():
     # Test basic sampler initialization
     alpha = lambda t: torch.ones_like(t)
     sigma = lambda t: t
-    schedule_params = {"t_min": 0.0, "t_max": 1.0, "L": 100}
 
-    sampler = Sampler(True, alpha, sigma, schedule_params)
+    sampler = Sampler(True, alpha, sigma)
     assert sampler.is_stochastic
-    assert len(sampler.schedule) == schedule_params["L"]
-    assert torch.allclose(sampler.schedule[0], torch.tensor(1.0))
-    assert torch.allclose(sampler.schedule[-1], torch.tensor(0.0))
+
+    # Test ts generation
+    ts_hparams = {"t_min": 0.0, "t_max": 1.0, "L": 100}
+    ts = sampler.get_ts(ts_hparams)
+    assert len(ts) == ts_hparams["L"]
+    assert torch.allclose(ts[0], torch.tensor(1.0))
+    assert torch.allclose(ts[-1], torch.tensor(0.0))
 
 
 def test_sampler_add_noise():
     # Test noise addition
     alpha = lambda t: torch.ones_like(t)
     sigma = lambda t: t
-    schedule_params = {"t_min": 0.0, "t_max": 1.0, "L": 100}
 
-    sampler = Sampler(True, alpha, sigma, schedule_params)
+    sampler = Sampler(True, alpha, sigma)
 
     batch_size = 10
     data_dim = 3
@@ -41,7 +43,7 @@ def test_sampler_add_noise():
 
 def test_ve_sampler():
     # Test VE sampler initialization and properties
-    sampler = VESampler(True, 0.0, 1.0, 100)
+    sampler = VESampler(True)
 
     # Test alpha and sigma functions
     t = torch.tensor([0.0, 0.5, 1.0])
@@ -64,7 +66,7 @@ def test_ve_sampler():
 
 def test_vp_sampler():
     # Test VP sampler initialization and properties
-    sampler = VPSampler(True, 0.0, 1.0, 100)
+    sampler = VPSampler(True)
 
     # Test alpha and sigma functions
     t = torch.tensor([0.0, 0.5, 1.0])
@@ -87,7 +89,7 @@ def test_vp_sampler():
 
 def test_fm_sampler():
     # Test FM sampler initialization and properties
-    sampler = FMSampler(True, 0.0, 1.0, 100)
+    sampler = FMSampler(True)
 
     # Test alpha and sigma functions
     t = torch.tensor([0.0, 0.5, 1.0])
@@ -110,7 +112,9 @@ def test_fm_sampler():
 
 def test_sampler_with_score():
     # Test sampling with score function
-    sampler = VPSampler(True, 0.01, 0.99, 10)
+    sampler = VPSampler(True)
+    ts_hparams = {"t_min": 0.01, "t_max": 0.99, "L": 10}
+    ts = sampler.get_ts(ts_hparams)
 
     batch_size = 10
     data_dim = 3
@@ -127,26 +131,26 @@ def test_sampler_with_score():
     zs = torch.randn(num_steps - 1, batch_size, data_dim)  # L-1 noise vectors
 
     # Test single sample
-    x = sampler.sample(score, x0, zs)
+    x = sampler.sample(score, x0, zs, ts)
     assert x.shape == (batch_size, data_dim)
 
     # Test trajectory
-    xs = sampler.sample_trajectory(score, x0, zs)
+    xs = sampler.sample_trajectory(score, x0, zs, ts)
 
     assert xs.shape == (num_steps, batch_size, data_dim)  # L steps
     assert torch.allclose(xs[0], x0)  # First step should be x0
     assert torch.allclose(xs[-1], x)  # Last step should match single sample
 
 
-def test_invalid_schedule_params():
-    lambda t: torch.ones_like(t)
+def test_invalid_ts_hparams():
+    sampler = VPSampler(True)
 
     # Test invalid t_min, t_max
     with pytest.raises(AssertionError):
-        VPSampler(True, -0.1, 1.0, 100)
+        sampler.get_ts({"t_min": -0.1, "t_max": 1.0, "L": 100})
 
     with pytest.raises(AssertionError):
-        VPSampler(True, 0.0, 1.1, 100)
+        sampler.get_ts({"t_min": 0.0, "t_max": 1.1, "L": 100})
 
     with pytest.raises(AssertionError):
-        VPSampler(True, 0.5, 0.3, 100)  # t_min > t_max
+        sampler.get_ts({"t_min": 0.5, "t_max": 0.3, "L": 100})  # t_min > t_max

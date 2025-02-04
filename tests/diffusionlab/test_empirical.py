@@ -2,7 +2,7 @@ import pytest
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from diffusionlab.distributions.empirical import EmpiricalDistribution
-from diffusionlab.samplers import VPSampler
+from diffusionlab.sampler import VPSampler
 from diffusionlab.vector_fields import VectorField, VectorFieldType
 
 # ============================================================================
@@ -13,7 +13,13 @@ from diffusionlab.vector_fields import VectorField, VectorFieldType
 @pytest.fixture
 def sampler():
     """Create a VP sampler for testing."""
-    return VPSampler(is_stochastic=False, t_min=0.001, t_max=0.99, L=100)
+    return VPSampler(is_stochastic=False)
+
+
+@pytest.fixture
+def ts_hparams():
+    """Create timestep params for testing."""
+    return {"t_min": 0.001, "t_max": 0.99, "L": 100}
 
 
 @pytest.fixture
@@ -65,8 +71,10 @@ def test_empirical_validation():
 # ============================================================================
 
 
-def test_empirical_sampling_with_sampler(sampler, dummy_data):
+def test_empirical_sampling_with_sampler(sampler, dummy_data, ts_hparams):
     """Test that sampling using VPSampler recovers the training distribution."""
+    ts = sampler.get_ts(ts_hparams)
+
     # Collect all training data
     X_train = []
     y_train = []
@@ -83,9 +91,9 @@ def test_empirical_sampling_with_sampler(sampler, dummy_data):
         lambda x, t: EmpiricalDistribution.x0(x, t, sampler, {}, dist_hparams),
         vector_field_type=VectorFieldType.X0,
     )
-    zs = torch.randn((sampler.schedule.shape[0] - 1, N, X_train.shape[-1]))
+    zs = torch.randn((ts.shape[0] - 1, N, X_train.shape[-1]))
     x0 = torch.randn((N, X_train.shape[-1]))
-    X_sampled = sampler.sample(x0_est, x0, zs)
+    X_sampled = sampler.sample(x0_est, x0, zs, ts)
 
     # Compute statistics of both distributions
     train_mean = X_train.mean(0)

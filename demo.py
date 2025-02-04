@@ -1,10 +1,11 @@
+from typing import cast
 import lightning
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from diffusionlab.distributions.gmm import IsoHomoGMMDistribution
 from diffusionlab.model import DiffusionModel
-from diffusionlab.samplers import FMSampler
+from diffusionlab.sampler import FMSampler
 from diffusionlab.vector_fields import VectorField, VectorFieldType
 
 lightning.seed_everything(42)
@@ -36,7 +37,8 @@ K = 4
 t_min = 0.01
 t_max = 0.99
 L = 100
-sampler = FMSampler(is_stochastic=False, t_min=t_min, t_max=t_max, L=L)
+train_ts_hparams = {"t_min": t_min, "t_max": t_max, "L": L}
+sampler = FMSampler(is_stochastic=False)
 
 means = torch.randn(K, D) * 3
 var = torch.tensor(0.5)
@@ -67,9 +69,10 @@ model = DiffusionModel(
     sampler=sampler,
     vector_field_type=VectorFieldType.EPS,
     optimizer=optimizer,
-    scheduler=scheduler,
+    lr_scheduler=scheduler,
     batchwise_val_metrics={},
     overall_val_metrics={},
+    train_ts_hparams=train_ts_hparams,
     t_loss_weights=lambda t: torch.ones_like(t),
     t_loss_probs=lambda t: torch.ones_like(t) / L,
     N_noise_per_sample=10,
@@ -91,7 +94,7 @@ sampling_vector_field = VectorField(model, vector_field_type=model.vector_field_
 N_sample = 20
 X0 = torch.randn(N_sample, D)
 Zs = torch.randn(L - 1, N_sample, D, device=X0.device)
-X_sample = sampler.sample(sampling_vector_field, X0, Zs)
+X_sample = sampler.sample(sampling_vector_field, X0, Zs, model.train_ts)
 
 distances = torch.cdist(X_sample, X_train).min(dim=1)
 print(distances)

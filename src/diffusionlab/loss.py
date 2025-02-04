@@ -3,7 +3,7 @@ from typing import Callable
 import torch
 from torch import nn
 
-from diffusionlab.samplers import Sampler
+from diffusionlab.sampler import Sampler
 from diffusionlab.utils import pad_shape_back
 from diffusionlab.vector_fields import VectorFieldType
 

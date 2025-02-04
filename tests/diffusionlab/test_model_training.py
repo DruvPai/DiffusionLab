@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from diffusionlab.distributions.gmm import IsoHomoGMMDistribution
 from diffusionlab.model import DiffusionModel
-from diffusionlab.samplers import FMSampler
+from diffusionlab.sampler import FMSampler
 from diffusionlab.vector_fields import VectorFieldType
 
 
@@ -37,7 +37,12 @@ def dummy_net():
 
 @pytest.fixture
 def dummy_sampler():
-    return FMSampler(is_stochastic=False, t_min=0.0, t_max=1.0, L=100)
+    return FMSampler(is_stochastic=False)
+
+
+@pytest.fixture
+def ts_hparams():
+    return {"t_min": 0.001, "t_max": 0.99, "L": 100}
 
 
 @pytest.fixture
@@ -59,7 +64,7 @@ def dummy_dataset(dummy_sampler):
 
 
 @pytest.fixture
-def model(dummy_net, dummy_sampler, dummy_dataset):
+def model(dummy_net, dummy_sampler, dummy_dataset, ts_hparams):
     def t_loss_weights(t):
         return torch.ones_like(t)
 
@@ -75,9 +80,10 @@ def model(dummy_net, dummy_sampler, dummy_dataset):
         sampler=dummy_sampler,
         vector_field_type=VectorFieldType.EPS,
         optimizer=optimizer,
-        scheduler=optim.lr_scheduler.ConstantLR(optimizer, factor=1),
+        lr_scheduler=optim.lr_scheduler.ConstantLR(optimizer, factor=1),
         batchwise_val_metrics={},
         overall_val_metrics={},
+        train_ts_hparams=ts_hparams,
         t_loss_weights=t_loss_weights,
         t_loss_probs=t_loss_probs,
         N_noise_per_sample=2,

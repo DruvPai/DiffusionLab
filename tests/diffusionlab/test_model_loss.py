@@ -3,7 +3,7 @@ import torch
 from torch import nn, optim
 from diffusionlab.model import DiffusionModel
 from diffusionlab.loss import SamplewiseDiffusionLoss
-from diffusionlab.samplers import Sampler
+from diffusionlab.sampler import Sampler
 from diffusionlab.vector_fields import VectorFieldType
 
 
@@ -20,18 +20,11 @@ class DummySampler(Sampler):
     def __init__(self):
         alpha = lambda t: 1 - t
         sigma = lambda t: t
-        schedule_params = {"t_min": 0.0, "t_max": 1.0, "L": 100}
         super().__init__(
             is_stochastic=False,
             alpha=alpha,
             sigma=sigma,
-            schedule_params=schedule_params,
         )
-
-    def add_noise(
-        self, x: torch.Tensor, t: torch.Tensor, eps: torch.Tensor
-    ) -> torch.Tensor:
-        return x + t.view(-1, 1, 1, 1) * eps
 
 
 @pytest.fixture
@@ -45,7 +38,12 @@ def dummy_sampler():
 
 
 @pytest.fixture
-def model(dummy_net, dummy_sampler):
+def ts_hparams():
+    return {"t_min": 0.001, "t_max": 0.99, "L": 100}
+
+
+@pytest.fixture
+def model(dummy_net, dummy_sampler, ts_hparams):
     def t_loss_weights(t):
         return torch.ones_like(t)
 
@@ -57,11 +55,12 @@ def model(dummy_net, dummy_sampler):
         sampler=dummy_sampler,
         vector_field_type=VectorFieldType.X0,
         optimizer=optim.Adam(dummy_net.parameters(), lr=1e-4),
-        scheduler=optim.lr_scheduler.StepLR(
+        lr_scheduler=optim.lr_scheduler.StepLR(
             optim.Adam(dummy_net.parameters(), lr=1e-4), step_size=1
         ),
         batchwise_val_metrics={},
         overall_val_metrics={},
+        train_ts_hparams=ts_hparams,
         t_loss_weights=t_loss_weights,
         t_loss_probs=t_loss_probs,
         N_noise_per_sample=2,
@@ -90,16 +89,18 @@ def test_loss_shape():
 def test_model_forward():
     """Test that the model forward pass works with correct shapes"""
     net = DummyNet()
+    ts_hparams = {"t_min": 0.0, "t_max": 1.0, "L": 100}
     model = DiffusionModel(
         net=net,
         sampler=DummySampler(),
         vector_field_type=VectorFieldType.X0,
         optimizer=optim.Adam(net.parameters(), lr=1e-4),
-        scheduler=optim.lr_scheduler.StepLR(
+        lr_scheduler=optim.lr_scheduler.StepLR(
             optim.Adam(net.parameters(), lr=1e-4), step_size=1
         ),
         batchwise_val_metrics={},
         overall_val_metrics={},
+        train_ts_hparams=ts_hparams,
         t_loss_weights=lambda t: torch.ones_like(t),
         t_loss_probs=lambda t: torch.ones_like(t) / len(t),
         N_noise_per_sample=2,
@@ -119,16 +120,18 @@ def test_model_forward():
 def test_model_loss():
     """Test that the model loss computation works"""
     net = DummyNet()
+    ts_hparams = {"t_min": 0.0, "t_max": 1.0, "L": 100}
     model = DiffusionModel(
         net=net,
         sampler=DummySampler(),
         vector_field_type=VectorFieldType.X0,
         optimizer=optim.Adam(net.parameters(), lr=1e-4),
-        scheduler=optim.lr_scheduler.StepLR(
+        lr_scheduler=optim.lr_scheduler.StepLR(
             optim.Adam(net.parameters(), lr=1e-4), step_size=1
         ),
         batchwise_val_metrics={},
         overall_val_metrics={},
+        train_ts_hparams=ts_hparams,
         t_loss_weights=lambda t: torch.ones_like(t),
         t_loss_probs=lambda t: torch.ones_like(t) / len(t),
         N_noise_per_sample=2,

@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from diffusionlab.distributions.base import Distribution
-from diffusionlab.samplers import Sampler
+from diffusionlab.sampler import Sampler
 
 
 class MockSampler(Sampler):
@@ -13,7 +13,6 @@ class MockSampler(Sampler):
             is_stochastic=True,
             alpha=lambda t: torch.ones_like(t),
             sigma=lambda t: torch.zeros_like(t),
-            schedule_params={"t_min": 0.0, "t_max": 1.0, "L": 10},
         )
 
 
