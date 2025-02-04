@@ -40,17 +40,17 @@ class DiffusionModel(LightningModule, VectorField):
             sampler, vector_field_type
         )
 
+        self.register_buffer("train_ts", torch.zeros((0,)))
+        self.register_buffer("train_ts_loss_weights", torch.zeros((0,)))
+        self.register_buffer("train_ts_loss_probs", torch.zeros((0,)))
         self.precompute_train_schedule(train_ts_hparams)
 
     def precompute_train_schedule(self, train_ts_hparams: Dict[str, float]) -> None:
-        train_ts = self.sampler.get_ts(train_ts_hparams).to(
+        self.train_ts = self.sampler.get_ts(train_ts_hparams).to(
             self.device, non_blocking=True
         )
-        train_ts_loss_weights: torch.Tensor = self.t_loss_weights(train_ts)
-        train_ts_loss_probs: torch.Tensor = self.t_loss_probs(train_ts)
-        self.register_buffer("train_ts", train_ts)
-        self.register_buffer("train_ts_loss_weights", train_ts_loss_weights)
-        self.register_buffer("train_ts_loss_probs", train_ts_loss_probs)
+        self.train_ts_loss_weights: torch.Tensor = self.t_loss_weights(self.train_ts)
+        self.train_ts_loss_probs: torch.Tensor = self.t_loss_probs(self.train_ts)
 
     def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         return self.net(x, t)
