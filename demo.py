@@ -1,4 +1,3 @@
-from typing import cast
 import lightning
 import torch
 from torch import nn
