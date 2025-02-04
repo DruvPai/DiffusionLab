@@ -43,7 +43,9 @@ class DiffusionModel(LightningModule, VectorField):
         self.precompute_train_schedule(train_ts_hparams)
 
     def precompute_train_schedule(self, train_ts_hparams: Dict[str, float]) -> None:
-        train_ts = self.sampler.get_ts(train_ts_hparams).to(self.device, non_blocking=True)
+        train_ts = self.sampler.get_ts(train_ts_hparams).to(
+            self.device, non_blocking=True
+        )
         train_ts_loss_weights: torch.Tensor = self.t_loss_weights(train_ts)
         train_ts_loss_probs: torch.Tensor = self.t_loss_probs(train_ts)
         self.register_buffer("train_ts", train_ts)
@@ -61,10 +63,14 @@ class DiffusionModel(LightningModule, VectorField):
     ]:
         return {"optimizer": self.optimizer, "lr_scheduler": self.lr_scheduler}
 
-    def loss(self, x: torch.Tensor, t: torch.Tensor, sample_weights: torch.Tensor) -> torch.Tensor:
+    def loss(
+        self, x: torch.Tensor, t: torch.Tensor, sample_weights: torch.Tensor
+    ) -> torch.Tensor:
         x = torch.repeat_interleave(x, self.N_noise_per_sample, dim=0)
         t = torch.repeat_interleave(t, self.N_noise_per_sample, dim=0)
-        sample_weights = torch.repeat_interleave(sample_weights, self.N_noise_per_sample, dim=0)
+        sample_weights = torch.repeat_interleave(
+            sample_weights, self.N_noise_per_sample, dim=0
+        )
 
         eps = torch.randn_like(x)
         xt = self.sampler.add_noise(x, t, eps)
@@ -75,9 +81,9 @@ class DiffusionModel(LightningModule, VectorField):
         return mean_loss
 
     def aggregate_loss(self, x: torch.Tensor) -> torch.Tensor:
-        t_idx = torch.multinomial(self.train_ts_loss_probs, x.shape[0], replacement=True).to(
-            self.device, non_blocking=True
-        )
+        t_idx = torch.multinomial(
+            self.train_ts_loss_probs, x.shape[0], replacement=True
+        ).to(self.device, non_blocking=True)
         t = self.train_ts[t_idx]
         t_weights = self.train_ts_loss_weights[t_idx]
         mean_loss = self.loss(x, t, t_weights)
@@ -89,7 +95,9 @@ class DiffusionModel(LightningModule, VectorField):
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
-    def validation_step(self, batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
+    def validation_step(
+        self, batch: torch.Tensor, batch_idx: int
+    ) -> Dict[str, torch.Tensor]:
         x, metadata = batch
         loss = self.aggregate_loss(x)
         metric_values = {}
