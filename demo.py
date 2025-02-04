@@ -77,7 +77,6 @@ model = DiffusionModel(
     N_noise_per_sample=10,
 )
 
-
 N_epochs = 1000
 trainer = lightning.Trainer(max_epochs=N_epochs, accelerator="cpu")
 trainer.fit(model, train_dataloader, val_dataloader)
