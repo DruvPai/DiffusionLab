@@ -6,7 +6,7 @@ from diffusionlab.distributions.gmm import (
     IsoGMMDistribution,
     LowRankGMMDistribution,
 )
-from diffusionlab.samplers import VPSampler
+from diffusionlab.sampler import VPSampler
 
 # ============================================================================
 # Fixtures
@@ -16,7 +16,13 @@ from diffusionlab.samplers import VPSampler
 @pytest.fixture
 def sampler():
     """Create a VP sampler for testing."""
-    return VPSampler(is_stochastic=False, t_min=0.01, t_max=0.99, L=100)
+    return VPSampler(is_stochastic=False)
+
+
+@pytest.fixture
+def ts_hparams():
+    """Create timestep params for testing."""
+    return {"t_min": 0.001, "t_max": 0.99, "L": 100}
 
 
 @pytest.fixture
@@ -557,7 +563,7 @@ def test_low_rank_gmm_equals_full_gmm():
     }
 
     # Test vector fields
-    sampler = VPSampler(is_stochastic=False, t_min=0.01, t_max=0.99, L=100)
+    sampler = VPSampler(is_stochastic=False)
     x = torch.randn(N, D)
     t = torch.ones(N) * 0.5
 
@@ -587,8 +593,9 @@ def test_low_rank_gmm_equals_full_gmm():
 # ============================================================================
 
 
-def test_gmm_x0_shape(sampler, denoising_gmm_params):
+def test_gmm_x0_shape(sampler, denoising_gmm_params, ts_hparams):
     """Test x0 prediction shape for GMM."""
+    ts = sampler.get_ts(ts_hparams)
     N = 10
     D = denoising_gmm_params["means"].shape[-1]
     x = torch.randn(N, D)
@@ -598,8 +605,9 @@ def test_gmm_x0_shape(sampler, denoising_gmm_params):
     assert x0_hat.shape == (N, D)
 
 
-def test_iso_homo_gmm_x0_shape(sampler, denoising_iso_homo_gmm_params):
+def test_iso_homo_gmm_x0_shape(sampler, denoising_iso_homo_gmm_params, ts_hparams):
     """Test x0 prediction shape for isotropic homogeneous GMM."""
+    ts = sampler.get_ts(ts_hparams)
     N = 10
     D = denoising_iso_homo_gmm_params["means"].shape[-1]
     x = torch.randn(N, D)
@@ -609,8 +617,9 @@ def test_iso_homo_gmm_x0_shape(sampler, denoising_iso_homo_gmm_params):
     assert x0_hat.shape == (N, D)
 
 
-def test_gmm_vector_field_types(sampler, denoising_gmm_params):
+def test_gmm_vector_field_types(sampler, denoising_gmm_params, ts_hparams):
     """Test all vector field types work correctly for GMM."""
+    ts = sampler.get_ts(ts_hparams)
     N = 10
     D = denoising_gmm_params["means"].shape[-1]
     x = torch.randn(N, D)
@@ -633,8 +642,9 @@ def test_gmm_vector_field_types(sampler, denoising_gmm_params):
     assert torch.allclose(x, x_from_x0, rtol=1e-5)
 
 
-def test_iso_homo_gmm_vector_field_types(sampler, denoising_iso_homo_gmm_params):
+def test_iso_homo_gmm_vector_field_types(sampler, denoising_iso_homo_gmm_params, ts_hparams):
     """Test all vector field types work correctly for isotropic homogeneous GMM."""
+    ts = sampler.get_ts(ts_hparams)
     N = 10
     D = denoising_iso_homo_gmm_params["means"].shape[-1]
     x = torch.randn(N, D)
@@ -661,8 +671,9 @@ def test_iso_homo_gmm_vector_field_types(sampler, denoising_iso_homo_gmm_params)
     assert torch.allclose(x, x_from_x0, rtol=1e-5)
 
 
-def test_iso_gmm_x0_shape(sampler, denoising_iso_gmm_params):
+def test_iso_gmm_x0_shape(sampler, denoising_iso_gmm_params, ts_hparams):
     """Test x0 prediction shape for isotropic GMM."""
+    ts = sampler.get_ts(ts_hparams)
     N = 10
     D = denoising_iso_gmm_params["means"].shape[-1]
     x = torch.randn(N, D)
@@ -672,8 +683,9 @@ def test_iso_gmm_x0_shape(sampler, denoising_iso_gmm_params):
     assert x0_hat.shape == (N, D)
 
 
-def test_iso_gmm_vector_field_types(sampler, denoising_iso_gmm_params):
+def test_iso_gmm_vector_field_types(sampler, denoising_iso_gmm_params, ts_hparams):
     """Test all vector field types work correctly for isotropic GMM."""
+    ts = sampler.get_ts(ts_hparams)
     N = 10
     D = denoising_iso_gmm_params["means"].shape[-1]
     x = torch.randn(N, D)
@@ -696,8 +708,9 @@ def test_iso_gmm_vector_field_types(sampler, denoising_iso_gmm_params):
     assert torch.allclose(x, x_from_x0, rtol=1e-5)
 
 
-def test_low_rank_gmm_x0_shape(sampler, denoising_low_rank_gmm_params):
+def test_low_rank_gmm_x0_shape(sampler, denoising_low_rank_gmm_params, ts_hparams):
     """Test x0 prediction shape for low-rank GMM."""
+    ts = sampler.get_ts(ts_hparams)
     N = 10
     D = denoising_low_rank_gmm_params["means"].shape[-1]
     x = torch.randn(N, D)
@@ -707,8 +720,9 @@ def test_low_rank_gmm_x0_shape(sampler, denoising_low_rank_gmm_params):
     assert x0_hat.shape == (N, D)
 
 
-def test_low_rank_gmm_vector_field_types(sampler, denoising_low_rank_gmm_params):
+def test_low_rank_gmm_vector_field_types(sampler, denoising_low_rank_gmm_params, ts_hparams):
     """Test all vector field types work correctly for low-rank GMM."""
+    ts = sampler.get_ts(ts_hparams)
     N = 10
     D = denoising_low_rank_gmm_params["means"].shape[-1]
     x = torch.randn(N, D)

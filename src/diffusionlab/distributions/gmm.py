@@ -3,7 +3,7 @@ from typing import Any, Dict, Tuple
 import torch
 
 from diffusionlab.distributions.base import Distribution
-from diffusionlab.samplers import Sampler
+from diffusionlab.sampler import Sampler
 from diffusionlab.utils import logdet_pd, sqrt_psd, vector_lstsq
 
 

@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from diffusionlab.distributions.base import Distribution
-from diffusionlab.samplers import Sampler
+from diffusionlab.sampler import Sampler
 from diffusionlab.utils import pad_shape_back
 
 
