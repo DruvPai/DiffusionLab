@@ -134,7 +134,7 @@ class GMMDistribution(Distribution):
                 torch.randn((X[idx].shape[0], D), device=device) @ sqrt_psd(covs[k])
                 + means[k][None, :]
             )
-        return X, y
+        return X.to("cpu"), y.to("cpu")
 
 
 class IsoGMMDistribution(Distribution):
@@ -496,4 +496,4 @@ class LowRankGMMDistribution(Distribution):
                 torch.randn((X[idx].shape[0], P), device=device) @ covs_factors[k].T
                 + means[k][None, :]
             )
-        return X, y
+        return X.to("cpu"), y.to("cpu")

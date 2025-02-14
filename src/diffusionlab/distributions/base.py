@@ -212,7 +212,7 @@ class Distribution:
         Returns:
             A tuple (samples, metadata), where samples is a tensor of shape (N, *D) and metadata is any additional information.
             For example, if the distribution has labels, the metadata is a tensor of shape (N, ) containing the labels.
-            Note that the samples are placed on the device corresponding to the sampler.
+            Note that the samples are always placed on the CPU.
         """
         raise NotImplementedError
 
