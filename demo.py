@@ -3,8 +3,9 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from diffusionlab.distributions.gmm import IsoHomoGMMDistribution
+from diffusionlab.distributions.empirical import EmpiricalDistribution
 from diffusionlab.models import DiffusionModel
-from diffusionlab.diffusions import FlowMatchingProcess
+from diffusionlab.diffusions import OrnsteinUhlenbeckProcess
 from diffusionlab.schedulers import UniformScheduler
 from diffusionlab.samplers import EulerMaruyamaSampler
 from diffusionlab.vector_fields import VectorField, VectorFieldType
@@ -43,7 +44,7 @@ stochastic_sampler = False
 
 scheduler = UniformScheduler()
 train_ts_hparams = {"t_min": t_min, "t_max": t_max, "L": L}
-diffusion_process = FlowMatchingProcess()
+diffusion_process = OrnsteinUhlenbeckProcess()
 sampler = EulerMaruyamaSampler(diffusion_process, stochastic_sampler)
 
 means = torch.randn(K, D) * 3
@@ -64,6 +65,9 @@ val_dataloader = DataLoader(
     TensorDataset(X_val, y_val), batch_size=N_batch, shuffle=False
 )
 
+emp_dist = EmpiricalDistribution()
+emp_dist_hparams = {"labeled_data": train_dataloader}
+
 M = 100
 net = TConditionedMLP(D, M)
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
@@ -74,7 +78,7 @@ model = DiffusionModel(
     net=net,
     diffusion_process=diffusion_process,
     train_scheduler=scheduler,
-    vector_field_type=VectorFieldType.EPS,
+    vector_field_type=VectorFieldType.X0,
     optimizer=optimizer,
     lr_scheduler=lr_scheduler,
     batchwise_metrics={},
@@ -96,6 +100,10 @@ sampling_vector_field = VectorField(model, vector_field_type=model.vector_field_
 #     ),
 #     vector_field_type=VectorFieldType.EPS,
 # )  # if you want to use the true eps function
+# sampling_vector_field = VectorField(
+#     lambda x, t: emp_dist.eps(x, t, diffusion_process, {}, emp_dist_hparams),
+#     vector_field_type=VectorFieldType.EPS,
+# )  # if you want to use the empirical eps function
 
 N_sample = 20
 X0 = torch.randn(N_sample, D)

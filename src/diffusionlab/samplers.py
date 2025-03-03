@@ -4,7 +4,11 @@ import torch
 
 from diffusionlab.diffusions import DiffusionProcess
 from diffusionlab.utils import pad_shape_back
-from diffusionlab.vector_fields import VectorField, VectorFieldType
+from diffusionlab.vector_fields import (
+    VectorField,
+    VectorFieldType,
+    convert_vector_field_type,
+)
 
 
 class Sampler:
@@ -477,239 +481,6 @@ class EulerMaruyamaSampler(Sampler):
         )
         return x + drift_t * dt
 
-    def sample_step_stochastic_x0(
-        self,
-        x0: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of stochastic sampling using the x0 vector field.
-
-        Args:
-            x0 (VectorField): The x0 vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        (
-            t,
-            t1,
-            alpha_t,
-            sigma_t,
-            alpha_prime_t,
-            sigma_prime_t,
-            dt,
-            dwt,
-            alpha_ratio_t,
-            sigma_ratio_t,
-            diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = (
-            alpha_ratio_t + 2 * diff_ratio_t
-        ) * x - 2 * alpha_t * diff_ratio_t * x0(x, self._fix_t_shape(x, t))
-        diffusion_t = torch.sqrt(2 * diff_ratio_t) * sigma_t
-        return x + drift_t * dt + diffusion_t * dwt
-
-    def sample_step_deterministic_x0(
-        self,
-        x0: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of deterministic sampling using the x0 vector field.
-
-        Args:
-            x0 (VectorField): The x0 vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        (
-            t,
-            t1,
-            alpha_t,
-            sigma_t,
-            alpha_prime_t,
-            sigma_prime_t,
-            dt,
-            dwt,
-            alpha_ratio_t,
-            sigma_ratio_t,
-            diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = sigma_ratio_t * x - alpha_t * diff_ratio_t * x0(
-            x, self._fix_t_shape(x, t)
-        )
-        return x + drift_t * dt
-
-    def sample_step_stochastic_eps(
-        self,
-        eps: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of stochastic sampling using the eps vector field.
-
-        Args:
-            eps (VectorField): The eps vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        (
-            t,
-            t1,
-            alpha_t,
-            sigma_t,
-            alpha_prime_t,
-            sigma_prime_t,
-            dt,
-            dwt,
-            alpha_ratio_t,
-            sigma_ratio_t,
-            diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = alpha_ratio_t * x + 2 * sigma_t * diff_ratio_t * eps(
-            x, self._fix_t_shape(x, t)
-        )
-        diffusion_t = torch.sqrt(2 * diff_ratio_t) * sigma_t
-        return x + drift_t * dt + diffusion_t * dwt
-
-    def sample_step_deterministic_eps(
-        self,
-        eps: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of deterministic sampling using the eps vector field.
-
-        Args:
-            eps (VectorField): The eps vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        (
-            t,
-            t1,
-            alpha_t,
-            sigma_t,
-            alpha_prime_t,
-            sigma_prime_t,
-            dt,
-            dwt,
-            alpha_ratio_t,
-            sigma_ratio_t,
-            diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = alpha_ratio_t * x + sigma_t * diff_ratio_t * eps(
-            x, self._fix_t_shape(x, t)
-        )
-        return x + drift_t * dt
-
-    def sample_step_stochastic_v(
-        self,
-        v: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of stochastic sampling using the v vector field.
-
-        Args:
-            v (VectorField): The velocity vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        (
-            t,
-            t1,
-            alpha_t,
-            sigma_t,
-            alpha_prime_t,
-            sigma_prime_t,
-            dt,
-            dwt,
-            alpha_ratio_t,
-            sigma_ratio_t,
-            diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = -alpha_ratio_t * x + v(x, self._fix_t_shape(x, t))
-        diffusion_t = torch.sqrt(2 * diff_ratio_t) * sigma_t
-        return x + drift_t * dt + diffusion_t * dwt
-
-    def sample_step_deterministic_v(
-        self,
-        v: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of deterministic sampling using the v vector field.
-
-        Args:
-            v (VectorField): The velocity vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        (
-            t,
-            t1,
-            alpha_t,
-            sigma_t,
-            alpha_prime_t,
-            sigma_prime_t,
-            dt,
-            dwt,
-            alpha_ratio_t,
-            sigma_ratio_t,
-            diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = v(x, self._fix_t_shape(x, t))
-        return x + drift_t * dt
-
     def sample_step_stochastic_score(
         self,
         score: VectorField,
@@ -762,3 +533,405 @@ class EulerMaruyamaSampler(Sampler):
         x_next = x + drift * dt + diffusion
 
         return x_next
+
+    def sample_step_deterministic_x0(
+        self,
+        x0: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Perform one step of deterministic sampling using the x0 vector field.
+
+        Args:
+            x0 (VectorField): The x0 vector field model
+            x (torch.Tensor): The current state, of shape (N, *D)
+            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
+            idx (int): The current step index
+            ts (torch.Tensor): The time steps tensor, of shape (L,)
+
+        Returns:
+            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+        """
+        (
+            t,
+            t1,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            dt,
+            dwt,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = self._get_step_quantities(zs, idx, ts)
+        drift_t = sigma_ratio_t * x - alpha_t * diff_ratio_t * x0(
+            x, self._fix_t_shape(x, t)
+        )
+        return x + drift_t * dt
+
+    def sample_step_stochastic_x0(
+        self,
+        x0: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Perform one step of stochastic sampling using the x0 vector field.
+
+        Args:
+            x0 (VectorField): The x0 vector field model
+            x (torch.Tensor): The current state, of shape (N, *D)
+            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
+            idx (int): The current step index
+            ts (torch.Tensor): The time steps tensor, of shape (L,)
+
+        Returns:
+            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+        """
+        (
+            t,
+            t1,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            dt,
+            dwt,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = self._get_step_quantities(zs, idx, ts)
+        drift_t = (
+            alpha_ratio_t + 2 * diff_ratio_t
+        ) * x - 2 * alpha_t * diff_ratio_t * x0(x, self._fix_t_shape(x, t))
+        diffusion_t = torch.sqrt(2 * diff_ratio_t) * sigma_t
+        return x + drift_t * dt + diffusion_t * dwt
+
+    def sample_step_deterministic_eps(
+        self,
+        eps: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Perform one step of deterministic sampling using the eps vector field.
+
+        Args:
+            eps (VectorField): The eps vector field model
+            x (torch.Tensor): The current state, of shape (N, *D)
+            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
+            idx (int): The current step index
+            ts (torch.Tensor): The time steps tensor, of shape (L,)
+
+        Returns:
+            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+        """
+        (
+            t,
+            t1,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            dt,
+            dwt,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = self._get_step_quantities(zs, idx, ts)
+        drift_t = alpha_ratio_t * x + sigma_t * diff_ratio_t * eps(
+            x, self._fix_t_shape(x, t)
+        )
+        return x + drift_t * dt
+
+    def sample_step_stochastic_eps(
+        self,
+        eps: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Perform one step of stochastic sampling using the eps vector field.
+
+        Args:
+            eps (VectorField): The eps vector field model
+            x (torch.Tensor): The current state, of shape (N, *D)
+            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
+            idx (int): The current step index
+            ts (torch.Tensor): The time steps tensor, of shape (L,)
+
+        Returns:
+            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+        """
+        (
+            t,
+            t1,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            dt,
+            dwt,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = self._get_step_quantities(zs, idx, ts)
+        drift_t = alpha_ratio_t * x + 2 * sigma_t * diff_ratio_t * eps(
+            x, self._fix_t_shape(x, t)
+        )
+        diffusion_t = torch.sqrt(2 * diff_ratio_t) * sigma_t
+        return x + drift_t * dt + diffusion_t * dwt
+
+    def sample_step_deterministic_v(
+        self,
+        v: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Perform one step of deterministic sampling using the v vector field.
+
+        Args:
+            v (VectorField): The velocity vector field model
+            x (torch.Tensor): The current state, of shape (N, *D)
+            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
+            idx (int): The current step index
+            ts (torch.Tensor): The time steps tensor, of shape (L,)
+
+        Returns:
+            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+        """
+        (
+            t,
+            t1,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            dt,
+            dwt,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = self._get_step_quantities(zs, idx, ts)
+        drift_t = v(x, self._fix_t_shape(x, t))
+        return x + drift_t * dt
+
+    def sample_step_stochastic_v(
+        self,
+        v: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Perform one step of stochastic sampling using the v vector field.
+
+        Args:
+            v (VectorField): The velocity vector field model
+            x (torch.Tensor): The current state, of shape (N, *D)
+            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
+            idx (int): The current step index
+            ts (torch.Tensor): The time steps tensor, of shape (L,)
+
+        Returns:
+            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+        """
+        (
+            t,
+            t1,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            dt,
+            dwt,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = self._get_step_quantities(zs, idx, ts)
+        drift_t = -alpha_ratio_t * x + v(x, self._fix_t_shape(x, t))
+        diffusion_t = torch.sqrt(2 * diff_ratio_t) * sigma_t
+        return x + drift_t * dt + diffusion_t * dwt
+
+
+class DDMSampler(Sampler):
+    """
+    Class for sampling from diffusion models using the DDPM/DDIM sampler.
+    """
+
+    def _convert_to_x0(
+        self,
+        x: torch.Tensor,
+        t: torch.Tensor,
+        fx: torch.Tensor,
+        fx_type: VectorFieldType,
+    ):
+        x0 = convert_vector_field_type(
+            x,
+            fx,
+            self.diffusion_process.alpha(t),
+            self.diffusion_process.sigma(t),
+            self.diffusion_process.alpha_prime(t),
+            self.diffusion_process.sigma_prime(t),
+            fx_type,
+            VectorFieldType.X0,
+        )
+        return x0
+
+    def _ddpm_step_x0_tensor(
+        self,
+        x0: torch.Tensor,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        t = pad_shape_back(ts[idx], x.shape)
+        t1 = pad_shape_back(ts[idx + 1], x.shape)
+        alpha_t = self.diffusion_process.alpha(t)
+        sigma_t = self.diffusion_process.sigma(t)
+        alpha_t1 = self.diffusion_process.alpha(t1)
+        sigma_t1 = self.diffusion_process.sigma(t1)
+
+        r11 = (alpha_t / alpha_t1) * (sigma_t1 / sigma_t)
+        r12 = r11 * (sigma_t1 / sigma_t)
+        r22 = r12 * (alpha_t / alpha_t1)
+
+        mean = r12 * x + alpha_t1 * (1 - r22) * x0
+        std = sigma_t1 * (1 - r11**2) ** (1 / 2)
+        return mean + std * zs[idx]
+
+    def _ddim_step_x0_tensor(
+        self,
+        x0: torch.Tensor,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        t = pad_shape_back(ts[idx], x.shape)
+        t1 = pad_shape_back(ts[idx + 1], x.shape)
+        alpha_t = self.diffusion_process.alpha(t)
+        sigma_t = self.diffusion_process.sigma(t)
+        alpha_t1 = self.diffusion_process.alpha(t1)
+        sigma_t1 = self.diffusion_process.sigma(t1)
+
+        r01 = sigma_t1 / sigma_t
+        r11 = (alpha_t / alpha_t1) * r01
+
+        mean = r01 * x + alpha_t1 * (1 - r11) * x0
+        return mean
+
+    def sample_step_deterministic_x0(
+        self,
+        x0: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        x0_value = x0(x, self._fix_t_shape(x, ts[idx]))
+        return self._ddim_step_x0_tensor(x0_value, x, zs, idx, ts)
+
+    def sample_step_stochastic_x0(
+        self,
+        x0: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        x0_value = x0(x, self._fix_t_shape(x, ts[idx]))
+        return self._ddpm_step_x0_tensor(x0_value, x, zs, idx, ts)
+
+    def sample_step_deterministic_score(
+        self,
+        score: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        t = pad_shape_back(ts[idx], x.shape)
+        score_value = score(x, self._fix_t_shape(x, t))
+        x0_value = self._convert_to_x0(x, t, score_value, VectorFieldType.SCORE)
+        return self._ddim_step_x0_tensor(x0_value, x, zs, idx, ts)
+
+    def sample_step_stochastic_score(
+        self,
+        score: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        t = pad_shape_back(ts[idx], x.shape)
+        score_value = score(x, self._fix_t_shape(x, t))
+        x0_value = self._convert_to_x0(x, t, score_value, VectorFieldType.SCORE)
+        return self._ddpm_step_x0_tensor(x0_value, x, zs, idx, ts)
+
+    def sample_step_deterministic_eps(
+        self,
+        eps: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        t = pad_shape_back(ts[idx], x.shape)
+        eps_value = eps(x, self._fix_t_shape(x, t))
+        x0_value = self._convert_to_x0(x, t, eps_value, VectorFieldType.EPS)
+        return self._ddpm_step_x0_tensor(x0_value, x, zs, idx, ts)
+
+    def sample_step_stochastic_eps(
+        self,
+        eps: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        t = pad_shape_back(ts[idx], x.shape)
+        eps_value = eps(x, self._fix_t_shape(x, t))
+        x0_value = self._convert_to_x0(x, t, eps_value, VectorFieldType.EPS)
+        return self._ddpm_step_x0_tensor(x0_value, x, zs, idx, ts)
+
+    def sample_step_deterministic_v(
+        self,
+        v: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        t = pad_shape_back(ts[idx], x.shape)
+        v_value = v(x, self._fix_t_shape(x, t))
+        x0_value = self._convert_to_x0(x, t, v_value, VectorFieldType.V)
+        return self._ddim_step_x0_tensor(x0_value, x, zs, idx, ts)
+
+    def sample_step_stochastic_v(
+        self,
+        v: VectorField,
+        x: torch.Tensor,
+        zs: torch.Tensor,
+        idx: int,
+        ts: torch.Tensor,
+    ) -> torch.Tensor:
+        t = pad_shape_back(ts[idx], x.shape)
+        v_value = v(x, self._fix_t_shape(x, t))
+        x0_value = self._convert_to_x0(x, t, v_value, VectorFieldType.V)
+        return self._ddpm_step_x0_tensor(x0_value, x, zs, idx, ts)

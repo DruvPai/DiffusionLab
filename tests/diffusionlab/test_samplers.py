@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from diffusionlab.diffusions import DiffusionProcess
-from diffusionlab.samplers import Sampler, EulerMaruyamaSampler
+from diffusionlab.samplers import Sampler, EulerMaruyamaSampler, DDMSampler
 from diffusionlab.vector_fields import VectorField, VectorFieldType
 
 
@@ -574,3 +574,270 @@ class TestEulerMaruyamaSampler:
         assert not torch.allclose(result_x0, x)
         assert not torch.allclose(result_eps, x)
         assert not torch.allclose(result_v, x)
+
+
+class TestDDMSampler:
+    def test_initialization(self):
+        """Test basic initialization of DDMSampler."""
+        # Create a mock diffusion process
+        alpha = lambda t: torch.ones_like(t)
+        sigma = lambda t: t
+        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+
+        # Initialize sampler
+        is_stochastic = True
+        sampler = DDMSampler(diffusion_process, is_stochastic)
+
+        # Check attributes
+        assert sampler.diffusion_process is diffusion_process
+        assert sampler.is_stochastic is is_stochastic
+
+    def test_convert_to_x0(self):
+        """Test the _convert_to_x0 method."""
+        # Create a mock diffusion process
+        alpha = lambda t: 1 - 0.5 * t
+        sigma = lambda t: torch.sqrt(t)
+        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+
+        # Initialize sampler
+        sampler = DDMSampler(diffusion_process, True)
+
+        # Create test inputs
+        batch_size = 2
+        data_dim = 3
+        x = torch.randn(batch_size, data_dim)
+        t = torch.tensor([0.5])
+
+        # Test conversion from different vector field types
+
+        # 1. Test SCORE to X0 conversion
+        score = -x  # Score of standard normal
+        x0_from_score = sampler._convert_to_x0(x, t, score, VectorFieldType.SCORE)
+        assert x0_from_score.shape == x.shape
+
+        # 2. Test EPS to X0 conversion
+        eps = torch.randn_like(x)
+        x0_from_eps = sampler._convert_to_x0(x, t, eps, VectorFieldType.EPS)
+        assert x0_from_eps.shape == x.shape
+
+        # 3. Test V to X0 conversion
+        v = torch.randn_like(x)
+        x0_from_v = sampler._convert_to_x0(x, t, v, VectorFieldType.V)
+        assert x0_from_v.shape == x.shape
+
+        # 4. Test X0 to X0 conversion (should be identity)
+        x0 = torch.zeros_like(x)
+        x0_from_x0 = sampler._convert_to_x0(x, t, x0, VectorFieldType.X0)
+        assert x0_from_x0.shape == x.shape
+        assert torch.allclose(x0_from_x0, x0)
+
+    def test_ddpm_step_x0_tensor(self):
+        """Test the _ddpm_step_x0_tensor method."""
+        # Create a mock diffusion process
+        alpha = lambda t: 1 - 0.5 * t
+        sigma = lambda t: torch.sqrt(t)
+        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+
+        # Initialize sampler
+        sampler = DDMSampler(diffusion_process, True)
+
+        # Create test inputs
+        batch_size = 2
+        data_dim = 3
+        x = torch.randn(batch_size, data_dim)
+        x0 = torch.zeros_like(x)  # Target is zero
+        zs = torch.randn(2, batch_size, data_dim)
+        idx = 0
+        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
+
+        # Call the method
+        result = sampler._ddpm_step_x0_tensor(x0, x, zs, idx, ts)
+
+        # Check shape
+        assert result.shape == x.shape
+
+    def test_ddim_step_x0_tensor(self):
+        """Test the _ddim_step_x0_tensor method."""
+        # Create a mock diffusion process
+        alpha = lambda t: 1 - 0.5 * t
+        sigma = lambda t: torch.sqrt(t)
+        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+
+        # Initialize sampler
+        sampler = DDMSampler(diffusion_process, False)
+
+        # Create test inputs
+        batch_size = 2
+        data_dim = 3
+        x = torch.randn(batch_size, data_dim)
+        x0 = torch.zeros_like(x)  # Target is zero
+        zs = torch.randn(2, batch_size, data_dim)  # Not used in deterministic case
+        idx = 0
+        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
+
+        # Call the method
+        result = sampler._ddim_step_x0_tensor(x0, x, zs, idx, ts)
+
+        # Check shape
+        assert result.shape == x.shape
+
+    def test_sample_step_deterministic_x0(self):
+        """Test the sample_step_deterministic_x0 method."""
+        # Create a mock diffusion process
+        alpha = lambda t: 1 - 0.5 * t
+        sigma = lambda t: torch.sqrt(t)
+        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+
+        # Initialize sampler
+        sampler = DDMSampler(diffusion_process, False)
+
+        # Create a simple x0 function that returns zeros
+        def x0_fn(x, t):
+            return torch.zeros_like(x)
+
+        vector_field = VectorField(x0_fn, VectorFieldType.X0)
+
+        # Create input tensors
+        batch_size = 5
+        data_dim = 3
+        x = torch.randn(batch_size, data_dim)
+        zs = torch.randn(2, batch_size, data_dim)  # Not used in deterministic case
+        idx = 0
+        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
+
+        # Call the method
+        result = sampler.sample_step_deterministic_x0(vector_field, x, zs, idx, ts)
+
+        # Check shape
+        assert result.shape == x.shape
+
+    def test_sample_step_stochastic_x0(self):
+        """Test the sample_step_stochastic_x0 method."""
+        # Create a mock diffusion process
+        alpha = lambda t: 1 - 0.5 * t
+        sigma = lambda t: torch.sqrt(t)
+        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+
+        # Initialize sampler
+        sampler = DDMSampler(diffusion_process, True)
+
+        # Create a simple x0 function that returns zeros
+        def x0_fn(x, t):
+            return torch.zeros_like(x)
+
+        vector_field = VectorField(x0_fn, VectorFieldType.X0)
+
+        # Create input tensors
+        batch_size = 5
+        data_dim = 3
+        x = torch.randn(batch_size, data_dim)
+        zs = torch.randn(2, batch_size, data_dim)
+        idx = 0
+        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
+
+        # Call the method
+        result = sampler.sample_step_stochastic_x0(vector_field, x, zs, idx, ts)
+
+        # Check shape
+        assert result.shape == x.shape
+
+    def test_other_vector_field_types(self):
+        """Test sampling with other vector field types (SCORE, EPS, V)."""
+        # Create a mock diffusion process
+        alpha = lambda t: 1 - 0.5 * t
+        sigma = lambda t: torch.sqrt(t)
+        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+
+        # Initialize samplers
+        deterministic_sampler = DDMSampler(diffusion_process, False)
+        stochastic_sampler = DDMSampler(diffusion_process, True)
+
+        # Create simple vector field functions
+        def field_fn(x, t):
+            return torch.zeros_like(x)
+
+        score_field = VectorField(field_fn, VectorFieldType.SCORE)
+        eps_field = VectorField(field_fn, VectorFieldType.EPS)
+        v_field = VectorField(field_fn, VectorFieldType.V)
+
+        # Create input tensors
+        batch_size = 5
+        data_dim = 3
+        x = torch.randn(batch_size, data_dim)
+        zs = torch.randn(2, batch_size, data_dim)
+        idx = 0
+        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
+
+        # Test deterministic methods
+        det_result_score = deterministic_sampler.sample_step_deterministic_score(
+            score_field, x, zs, idx, ts
+        )
+        det_result_eps = deterministic_sampler.sample_step_deterministic_eps(
+            eps_field, x, zs, idx, ts
+        )
+        det_result_v = deterministic_sampler.sample_step_deterministic_v(
+            v_field, x, zs, idx, ts
+        )
+
+        # Check shapes
+        assert det_result_score.shape == x.shape
+        assert det_result_eps.shape == x.shape
+        assert det_result_v.shape == x.shape
+
+        # Test stochastic methods
+        stoch_result_score = stochastic_sampler.sample_step_stochastic_score(
+            score_field, x, zs, idx, ts
+        )
+        stoch_result_eps = stochastic_sampler.sample_step_stochastic_eps(
+            eps_field, x, zs, idx, ts
+        )
+        stoch_result_v = stochastic_sampler.sample_step_stochastic_v(
+            v_field, x, zs, idx, ts
+        )
+
+        # Check shapes
+        assert stoch_result_score.shape == x.shape
+        assert stoch_result_eps.shape == x.shape
+        assert stoch_result_v.shape == x.shape
+
+    def test_end_to_end_sampling(self):
+        """Test end-to-end sampling with DDMSampler."""
+        # Create a mock diffusion process
+        alpha = lambda t: 1 - 0.5 * t
+        sigma = lambda t: torch.sqrt(t)
+        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+
+        # Initialize sampler
+        sampler = DDMSampler(
+            diffusion_process, False
+        )  # Deterministic for reproducibility
+
+        # Create a simple x0 function that returns zeros
+        def x0_fn(x, t):
+            return torch.zeros_like(x)
+
+        vector_field = VectorField(x0_fn, VectorFieldType.X0)
+
+        # Create input tensors
+        batch_size = 3
+        data_dim = 2
+        x_t = torch.randn(batch_size, data_dim)  # Initial noisy samples
+        num_steps = 5
+        zs = torch.randn(num_steps - 1, batch_size, data_dim)  # Noise for each step
+        ts = torch.linspace(1.0, 0.0, num_steps)  # Time steps from t=1 to t=0
+
+        # Sample
+        result = sampler.sample(vector_field, x_t, zs, ts)
+
+        # Check shape
+        assert result.shape == (batch_size, data_dim)
+
+        # Sample trajectory
+        trajectory = sampler.sample_trajectory(vector_field, x_t, zs, ts)
+
+        # Check shape
+        assert trajectory.shape == (num_steps, batch_size, data_dim)
+        assert torch.allclose(trajectory[0], x_t)  # First point should be x_t
+        assert torch.allclose(
+            trajectory[-1], result
+        )  # Last point should be the final sample

@@ -89,7 +89,7 @@ wheels = [
 
 [[package]]
 name = "diffusionlab"
-version = "1.2.2"
+version = "2.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "lightning" },
