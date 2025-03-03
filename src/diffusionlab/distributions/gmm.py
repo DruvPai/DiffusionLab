@@ -2,9 +2,9 @@ from typing import Any, Dict, Tuple
 
 import torch
 
+from diffusionlab.diffusions import DiffusionProcess
 from diffusionlab.distributions.base import Distribution
-from diffusionlab.sampler import Sampler
-from diffusionlab.utils import logdet_pd, sqrt_psd, vector_lstsq
+from diffusionlab.utils import logdet_pd, sqrt_psd
 
 
 class GMMDistribution(Distribution):
@@ -73,26 +73,48 @@ class GMMDistribution(Distribution):
     @classmethod
     def x0(
         cls,
-        xt: torch.Tensor,
+        x_t: torch.Tensor,
         t: torch.Tensor,
-        sampler: Sampler,
+        diffusion_process: DiffusionProcess,
         batched_dist_params: Dict[str, torch.Tensor],
         dist_hparams: Dict[str, Any],
     ) -> torch.Tensor:
+        """
+        Computes the denoiser E[x_0 | x_t] for a GMM distribution.
+
+        Arguments:
+            x_t: The input tensor, of shape (N, D).
+            t: The time tensor, of shape (N, ).
+            diffusion_process: The diffusion process.
+            batched_dist_params: A dictionary containing the batched parameters of the distribution.
+                - means: A tensor of shape (N, K, D) containing the means of the components.
+                - covs: A tensor of shape (N, K, D, D) containing the covariance matrices of the components.
+                - priors: A tensor of shape (N, K) containing the prior probabilities of the components.
+            dist_hparams: A dictionary of hyperparameters for the distribution.
+
+        Returns:
+            The prediction of x_0, of shape (N, D).
+
+        Note:
+            The batched_dist_params dictionary contains BATCHED tensors, i.e., the first dimension is the batch dimension.
+        """
         means = batched_dist_params["means"]  # (N, K, D)
         covs = batched_dist_params["covs"]  # (N, K, D, D)
         priors = batched_dist_params["priors"]  # (N, K)
 
         N, K, D = means.shape
 
-        alpha = sampler.alpha(t)  # (N, )
-        sigma = sampler.sigma(t)  # (N, )
+        alpha = diffusion_process.alpha(t)  # (N, )
+        sigma = diffusion_process.sigma(t)  # (N, )
 
         covs_t = (alpha[:, None, None, None] ** 2) * covs + (
             sigma[:, None, None, None] ** 2
-        ) * torch.eye(D, device=xt.device)[None, None, :, :]  # (N, K, D, D)
-        centered_x = xt[:, None, :] - alpha[:, None, None] * means  # (N, K, D)
-        covs_t_inv_centered_x = vector_lstsq(covs_t, centered_x)  # (N, K, D)
+        ) * torch.eye(D, device=x_t.device)[None, None, :, :]  # (N, K, D, D)
+        centered_x = x_t[:, None, :] - alpha[:, None, None] * means  # (N, K, D)
+        covs_t_inv_centered_x = torch.linalg.lstsq(
+            covs_t,  # (N, K, D, D)
+            centered_x[..., None],  # (N, K, D, 1)
+        ).solution[..., 0]  # (N, K, D, 1) -> (N, K, D)
 
         mahalanobis_dists = torch.sum(
             centered_x * covs_t_inv_centered_x, dim=-1
@@ -107,7 +129,7 @@ class GMMDistribution(Distribution):
             softmax_w[:, :, None] * covs_t_inv_centered_x, dim=-2
         )  # (N, D)
         x0_hat = (1 / alpha[:, None]) * (
-            xt - (sigma[:, None] ** 2) * weighted_normalized_x
+            x_t - (sigma[:, None] ** 2) * weighted_normalized_x
         )  # (N, D)
 
         return x0_hat
@@ -192,23 +214,43 @@ class IsoGMMDistribution(Distribution):
     @classmethod
     def x0(
         cls,
-        xt: torch.Tensor,
+        x_t: torch.Tensor,
         t: torch.Tensor,
-        sampler: Sampler,
+        diffusion_process: DiffusionProcess,
         batched_dist_params: Dict[str, torch.Tensor],
         dist_hparams: Dict[str, Any],
     ) -> torch.Tensor:
+        """
+        Computes the denoiser E[x_0 | x_t] for an isotropic GMM distribution.
+
+        Arguments:
+            x_t: The input tensor, of shape (N, D).
+            t: The time tensor, of shape (N, ).
+            diffusion_process: The diffusion process whose forward and reverse dynamics determine
+                the time-evolution of the vector fields corresponding to the distribution.
+            batched_dist_params: A dictionary containing the batched parameters of the distribution.
+                - means: A tensor of shape (N, K, D) containing the means of the components.
+                - vars: A tensor of shape (N, K) containing the variances of the components.
+                - priors: A tensor of shape (N, K) containing the prior probabilities of the components.
+            dist_hparams: A dictionary of hyperparameters for the distribution.
+
+        Returns:
+            The prediction of x_0, of shape (N, D).
+
+        Note:
+            The batched_dist_params dictionary contains BATCHED tensors, i.e., the first dimension is the batch dimension.
+        """
         means = batched_dist_params["means"]  # (N, K, D)
         vars_ = batched_dist_params["vars"]  # (N, K)
         priors = batched_dist_params["priors"]  # (N, K)
 
         N, K, D = means.shape
 
-        alpha = sampler.alpha(t)  # (N, )
-        sigma = sampler.sigma(t)  # (N, )
+        alpha = diffusion_process.alpha(t)  # (N, )
+        sigma = diffusion_process.sigma(t)  # (N, )
 
         vars_t = (alpha[:, None] ** 2) * vars_ + (sigma[:, None] ** 2)  # (N, K)
-        centered_x = xt[:, None, :] - alpha[:, None, None] * means  # (N, K, D)
+        centered_x = x_t[:, None, :] - alpha[:, None, None] * means  # (N, K, D)
         vars_t_inv_centered_x = centered_x / vars_t[:, :, None]  # (N, K, D)
 
         mahalanobis_dists = torch.sum(
@@ -223,7 +265,7 @@ class IsoGMMDistribution(Distribution):
             softmax_w[:, :, None] * vars_t_inv_centered_x, dim=-2
         )  # (N, D)
         x0_hat = (1 / alpha[:, None]) * (
-            xt - (sigma[:, None] ** 2) * weighted_normalized_x
+            x_t - (sigma[:, None] ** 2) * weighted_normalized_x
         )  # (N, D)
 
         return x0_hat
@@ -235,6 +277,22 @@ class IsoGMMDistribution(Distribution):
         dist_params: Dict[str, torch.Tensor],
         dist_hparams: Dict[str, Any],
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Draws N i.i.d. samples from the isotropic GMM distribution.
+
+        Arguments:
+            N: The number of samples to draw.
+            dist_params: A dictionary of parameters for the distribution.
+                - means: A tensor of shape (K, D) containing the means of the components.
+                - vars: A tensor of shape (K, ) containing the variances of the components.
+                - priors: A tensor of shape (K, ) containing the prior probabilities of the components.
+            dist_hparams: A dictionary of hyperparameters for the distribution.
+
+        Returns:
+            A tuple (samples, labels), where samples is a tensor of shape (N, D) and labels is a tensor of shape (N, )
+            containing the component indices from which each sample was drawn.
+            Note that the samples are always placed on the CPU.
+        """
         means = dist_params["means"]  # (K, D)
         vars_ = dist_params["vars"]  # (K, )
         priors = dist_params["priors"]  # (K, )
@@ -304,23 +362,43 @@ class IsoHomoGMMDistribution(Distribution):
     @classmethod
     def x0(
         cls,
-        xt: torch.Tensor,
+        x_t: torch.Tensor,
         t: torch.Tensor,
-        sampler: Sampler,
+        diffusion_process: DiffusionProcess,
         batched_dist_params: Dict[str, torch.Tensor],
         dist_hparams: Dict[str, Any],
     ) -> torch.Tensor:
+        """
+        Computes the denoiser E[x_0 | x_t] for an isotropic homoscedastic GMM distribution.
+
+        Arguments:
+            x_t: The input tensor, of shape (N, D).
+            t: The time tensor, of shape (N, ).
+            diffusion_process: The diffusion process whose forward and reverse dynamics determine
+                the time-evolution of the vector fields corresponding to the distribution.
+            batched_dist_params: A dictionary containing the batched parameters of the distribution.
+                - means: A tensor of shape (N, K, D) containing the means of the components.
+                - var: A tensor of shape (N, ) containing the shared variance of all components.
+                - priors: A tensor of shape (N, K) containing the prior probabilities of the components.
+            dist_hparams: A dictionary of hyperparameters for the distribution.
+
+        Returns:
+            The prediction of x_0, of shape (N, D).
+
+        Note:
+            The batched_dist_params dictionary contains BATCHED tensors, i.e., the first dimension is the batch dimension.
+        """
         means = batched_dist_params["means"]  # (N, K, D)
         var = batched_dist_params["var"]  # (N, )
         priors = batched_dist_params["priors"]  # (N, K)
 
         N, K, D = means.shape
 
-        alpha = sampler.alpha(t)  # (N, )
-        sigma = sampler.sigma(t)  # (N, )
+        alpha = diffusion_process.alpha(t)  # (N, )
+        sigma = diffusion_process.sigma(t)  # (N, )
 
         var_t = (alpha**2) * var + (sigma**2)  # (N, )
-        centered_x = xt[:, None, :] - alpha[:, None, None] * means  # (N, K, D)
+        centered_x = x_t[:, None, :] - alpha[:, None, None] * means  # (N, K, D)
         vars_t_inv_centered_x = centered_x / var_t[:, None, None]  # (N, K, D)
 
         mahalanobis_dists = torch.sum(
@@ -333,7 +411,7 @@ class IsoHomoGMMDistribution(Distribution):
             softmax_w[:, :, None] * vars_t_inv_centered_x, dim=-2
         )  # (N, D)
         x0_hat = (1 / alpha[:, None]) * (
-            xt - (sigma[:, None] ** 2) * weighted_normalized_x
+            x_t - (sigma[:, None] ** 2) * weighted_normalized_x
         )  # (N, D)
 
         return x0_hat
@@ -345,6 +423,22 @@ class IsoHomoGMMDistribution(Distribution):
         dist_params: Dict[str, torch.Tensor],
         dist_hparams: Dict[str, Any],
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Draws N i.i.d. samples from the isotropic homoscedastic GMM distribution.
+
+        Arguments:
+            N: The number of samples to draw.
+            dist_params: A dictionary of parameters for the distribution.
+                - means: A tensor of shape (K, D) containing the means of the components.
+                - var: A tensor of shape () containing the shared variance of all components.
+                - priors: A tensor of shape (K, ) containing the prior probabilities of the components.
+            dist_hparams: A dictionary of hyperparameters for the distribution.
+
+        Returns:
+            A tuple (samples, labels), where samples is a tensor of shape (N, D) and labels is a tensor of shape (N, )
+            containing the component indices from which each sample was drawn.
+            Note that the samples are always placed on the CPU.
+        """
         means = dist_params["means"]  # (K, D)
         var = dist_params["var"]  # ()
         priors = dist_params["priors"]  # (K, )
@@ -417,12 +511,33 @@ class LowRankGMMDistribution(Distribution):
     @classmethod
     def x0(
         cls,
-        xt: torch.Tensor,
+        x_t: torch.Tensor,
         t: torch.Tensor,
-        sampler: Sampler,
+        diffusion_process: DiffusionProcess,
         batched_dist_params: Dict[str, torch.Tensor],
         dist_hparams: Dict[str, Any],
     ) -> torch.Tensor:
+        """
+        Computes the denoiser E[x_0 | x_t] for a low-rank GMM distribution.
+
+        Arguments:
+            x_t: The input tensor, of shape (N, D).
+            t: The time tensor, of shape (N, ).
+            diffusion_process: The diffusion process whose forward and reverse dynamics determine
+                the time-evolution of the vector fields corresponding to the distribution.
+            batched_dist_params: A dictionary containing the batched parameters of the distribution.
+                - means: A tensor of shape (N, K, D) containing the means of the components.
+                - covs_factors: A tensor of shape (N, K, D, P) containing the tall factors of the covariance matrices.
+                - priors: A tensor of shape (N, K) containing the prior probabilities of the components.
+            dist_hparams: A dictionary of hyperparameters for the distribution.
+
+        Returns:
+            The prediction of x_0, of shape (N, D).
+
+        Note:
+            The batched_dist_params dictionary contains BATCHED tensors, i.e., the first dimension is the batch dimension.
+            The covariance matrices are implicitly defined as Sigma_i = A_i @ A_i^T, where A_i is the ith factor.
+        """
         means = batched_dist_params["means"]  # (N, K, D)
         covs_factors = batched_dist_params["covs_factors"]  # (N, K, D, R)
         priors = batched_dist_params["priors"]  # (N, K)
@@ -430,8 +545,8 @@ class LowRankGMMDistribution(Distribution):
         N, K, D, P = covs_factors.shape
         covs_factors_T = covs_factors.transpose(-1, -2)  # (N, K, R, D)
 
-        alpha = sampler.alpha(t)  # (N, )
-        sigma = sampler.sigma(t)  # (N, )
+        alpha = diffusion_process.alpha(t)  # (N, )
+        sigma = diffusion_process.sigma(t)  # (N, )
         alpha_sigma_ratio_sq = (alpha / sigma) ** 2  # (N, )
         sigma_alpha_ratio_sq = 1 / alpha_sigma_ratio_sq  # (N, )
 
@@ -441,7 +556,7 @@ class LowRankGMMDistribution(Distribution):
             + alpha_sigma_ratio_sq[:, None, None, None] * internal_covs  # (N, K, P, P)
         )  # (N, K)
 
-        centered_x = xt[:, None, :] - alpha[:, None, None] * means  # (N, K, D)
+        centered_x = x_t[:, None, :] - alpha[:, None, None] * means  # (N, K, D)
         covs_t_inv_centered_x = (1 / sigma[:, None, None] ** 2) * (
             centered_x  # (N, K, D)
             - (
@@ -453,8 +568,8 @@ class LowRankGMMDistribution(Distribution):
                         None, None, :, :
                     ],  # (1, 1, P, P)
                     covs_factors_T @ centered_x[:, :, :, None],  # (N, K, P, 1)
-                ).solution
-            )[:, :, :, 0]  # (N, K, D)
+                ).solution  # (N, K, P, 1)
+            )[:, :, :, 0]  # (N, K, D, 1) -> (N, K, D)
         )  # (N, K, D)
 
         mahalanobis_dists = torch.sum(
@@ -469,7 +584,7 @@ class LowRankGMMDistribution(Distribution):
             softmax_w[:, :, None] * covs_t_inv_centered_x, dim=-2
         )  # (N, D)
         x0_hat = (1 / alpha[:, None]) * (
-            xt - (sigma[:, None] ** 2) * weighted_normalized_x
+            x_t - (sigma[:, None] ** 2) * weighted_normalized_x
         )  # (N, D)
 
         return x0_hat
@@ -481,6 +596,22 @@ class LowRankGMMDistribution(Distribution):
         dist_params: Dict[str, torch.Tensor],
         dist_hparams: Dict[str, Any],
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Draws N i.i.d. samples from the low-rank GMM distribution.
+
+        Arguments:
+            N: The number of samples to draw.
+            dist_params: A dictionary of parameters for the distribution.
+                - means: A tensor of shape (K, D) containing the means of the components.
+                - covs_factors: A tensor of shape (K, D, P) containing the tall factors of the covariance matrices.
+                - priors: A tensor of shape (K, ) containing the prior probabilities of the components.
+            dist_hparams: A dictionary of hyperparameters for the distribution.
+
+        Returns:
+            A tuple (samples, labels), where samples is a tensor of shape (N, D) and labels is a tensor of shape (N, )
+            containing the component indices from which each sample was drawn.
+            Note that the samples are always placed on the CPU.
+        """
         means = dist_params["means"]  # (K, D)
         covs_factors = dist_params["covs_factors"]  # (K, D, P)
         priors = dist_params["priors"]  # (K, )

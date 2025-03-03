@@ -5,8 +5,9 @@ from torch import nn, optim
 from torch.utils.data import DataLoader, TensorDataset
 
 from diffusionlab.distributions.gmm import IsoHomoGMMDistribution
-from diffusionlab.model import DiffusionModel
-from diffusionlab.sampler import FMSampler
+from diffusionlab.models import DiffusionModel
+from diffusionlab.diffusions import FlowMatchingProcess
+from diffusionlab.schedulers import UniformScheduler
 from diffusionlab.vector_fields import VectorFieldType
 
 
@@ -36,8 +37,13 @@ def dummy_net():
 
 
 @pytest.fixture
-def dummy_sampler():
-    return FMSampler(is_stochastic=False)
+def dummy_diffusion_process():
+    return FlowMatchingProcess()
+
+
+@pytest.fixture
+def dummy_scheduler():
+    return UniformScheduler()
 
 
 @pytest.fixture
@@ -46,7 +52,7 @@ def ts_hparams():
 
 
 @pytest.fixture
-def dummy_dataset(dummy_sampler):
+def dummy_dataset():
     means = torch.randn((3, 2)) * 5
     priors = torch.rand(3)
     priors = priors / priors.sum()
@@ -64,7 +70,9 @@ def dummy_dataset(dummy_sampler):
 
 
 @pytest.fixture
-def model(dummy_net, dummy_sampler, dummy_dataset, ts_hparams):
+def model(
+    dummy_net, dummy_diffusion_process, dummy_scheduler, dummy_dataset, ts_hparams
+):
     def t_loss_weights(t):
         return torch.ones_like(t)
 
@@ -77,16 +85,17 @@ def model(dummy_net, dummy_sampler, dummy_dataset, ts_hparams):
 
     return DiffusionModel(
         net=dummy_net,
-        sampler=dummy_sampler,
+        diffusion_process=dummy_diffusion_process,
+        train_scheduler=dummy_scheduler,
         vector_field_type=VectorFieldType.EPS,
         optimizer=optimizer,
         lr_scheduler=optim.lr_scheduler.ConstantLR(optimizer, factor=1),
-        batchwise_val_metrics={},
-        overall_val_metrics={},
+        batchwise_metrics={},
+        batchfree_metrics={},
         train_ts_hparams=ts_hparams,
         t_loss_weights=t_loss_weights,
         t_loss_probs=t_loss_probs,
-        N_noise_per_sample=2,
+        N_noise_draws_per_sample=2,
     )
 
 
