@@ -2,15 +2,20 @@ from typing import Any, Dict, Tuple
 
 import torch
 
-from diffusionlab.sampler import Sampler
+from diffusionlab.diffusions import DiffusionProcess
 from diffusionlab.vector_fields import VectorFieldType, convert_vector_field_type
 
 
 class Distribution:
     """
     Base class for all distributions.
-    It should be subclassed by other distributions for you want to use the ground truth
-    scores (resp. denoisers, noise predictors, velocity estimators).
+
+    This class should be subclassed by other distributions when you want to use ground truth
+    scores, denoisers, noise predictors, or velocity estimators.
+
+    Each distribution implementation provides methods to compute various vector fields
+    related to the diffusion process, such as denoising (x0), noise prediction (eps),
+    velocity estimation (v), and score estimation.
     """
 
     @classmethod
@@ -37,7 +42,8 @@ class Distribution:
         Validate the parameters for the distribution.
 
         Arguments:
-            dist_params: A dictionary of parameters for the distribution. Each value is a PyTorch tensor, possibly having a batch dimension.
+            possibly_batched_dist_params: A dictionary of parameters for the distribution.
+                Each value is a PyTorch tensor, possibly having a batch dimension.
 
         Returns:
             None
@@ -50,65 +56,76 @@ class Distribution:
     @classmethod
     def x0(
         cls,
-        xt: torch.Tensor,
+        x_t: torch.Tensor,
         t: torch.Tensor,
-        sampler: Sampler,
+        diffusion_process: DiffusionProcess,
         batched_dist_params: Dict[str, torch.Tensor],
         dist_hparams: Dict[str, Any],
     ) -> torch.Tensor:
         """
-        Computes the denoiser E[x0 | xt] at a given time t and input xt, under the data model
+        Computes the denoiser E[x_0 | x_t] at a given time t and input x_t, under the data model
 
-        xt = alpha(t) * x0 + sigma(t) * eps
+        x_t = alpha(t) * x_0 + sigma(t) * eps
 
-        where x0 is drawn from the data distribution, and eps is drawn independently from N(0, I).
+        where x_0 is drawn from the data distribution, and eps is drawn independently from N(0, I).
 
         Arguments:
-            xt: The input tensor, of shape (N, *D), where *D is the shape of each data.
+            x_t: The input tensor, of shape (N, *D), where *D is the shape of each data.
             t: The time tensor, of shape (N, ).
-            sampler: The sampler whose forward and reverse dynamics determine the time-evolution of the vector fields corresponding to the distribution.
-            batched_dist_params: A dictionary of batched parameters for the distribution. Each parameter is of shape (N, *P) where P is the shape of the parameter.
+            diffusion_process: The diffusion process whose forward and reverse dynamics determine
+                the time-evolution of the vector fields corresponding to the distribution.
+            batched_dist_params: A dictionary of batched parameters for the distribution.
+                Each parameter is of shape (N, *P) where P is the shape of the parameter.
             dist_hparams: A dictionary of hyperparameters for the distribution.
+
         Returns:
-            The prediction of x0, of shape (N, *D).
+            The prediction of x_0, of shape (N, *D).
+
+        Note:
+            The batched_dist_params dictionary contains BATCHED tensors, i.e., the first dimension is the batch dimension.
         """
         raise NotImplementedError
 
     @classmethod
     def eps(
         cls,
-        xt: torch.Tensor,
+        x_t: torch.Tensor,
         t: torch.Tensor,
-        sampler: Sampler,
+        diffusion_process: DiffusionProcess,
         batched_dist_params: Dict[str, torch.Tensor],
         dist_hparams: Dict[str, Any],
     ) -> torch.Tensor:
         """
-        Computes the noise predictor E[eps | xt] at a given time t and input xt, under the data model
+        Computes the noise predictor E[eps | x_t] at a given time t and input x_t, under the data model
 
-        xt = alpha(t) * x0 + sigma(t) * eps
+        x_t = alpha(t) * x_0 + sigma(t) * eps
 
-        where x0 is drawn from the data distribution, and eps is drawn independently from N(0, I).
+        where x_0 is drawn from the data distribution, and eps is drawn independently from N(0, I).
         This is stateless for the same reason as the denoiser method.
 
         Arguments:
-            xt: The input tensor, of shape (N, *D), where *D is the shape of each data.
+            x_t: The input tensor, of shape (N, *D), where *D is the shape of each data.
             t: The time tensor, of shape (N, ).
-            sampler: The sampler whose forward and reverse dynamics determine the time-evolution of the vector fields corresponding to the distribution.
-            batched_dist_params: A dictionary of batched parameters for the distribution. Each parameter is of shape (N, *P) where P is the shape of the parameter.
+            diffusion_process: The diffusion process whose forward and reverse dynamics determine
+                the time-evolution of the vector fields corresponding to the distribution.
+            batched_dist_params: A dictionary of batched parameters for the distribution.
+                Each parameter is of shape (N, *P) where P is the shape of the parameter.
             dist_hparams: A dictionary of hyperparameters for the distribution.
 
         Returns:
             The prediction of eps, of shape (N, *D).
+
+        Note:
+            The batched_dist_params dictionary contains BATCHED tensors, i.e., the first dimension is the batch dimension.
         """
-        x0_hat = cls.x0(xt, t, sampler, batched_dist_params, dist_hparams)
+        x0_hat = cls.x0(x_t, t, diffusion_process, batched_dist_params, dist_hparams)
         eps_hat = convert_vector_field_type(
-            xt,
+            x_t,
             x0_hat,
-            sampler.alpha(t),
-            sampler.sigma(t),
-            sampler.alpha_prime(t),
-            sampler.sigma_prime(t),
+            diffusion_process.alpha(t),
+            diffusion_process.sigma(t),
+            diffusion_process.alpha_prime(t),
+            diffusion_process.sigma_prime(t),
             in_type=VectorFieldType.X0,
             out_type=VectorFieldType.EPS,
         )
@@ -117,38 +134,43 @@ class Distribution:
     @classmethod
     def v(
         cls,
-        xt: torch.Tensor,
+        x_t: torch.Tensor,
         t: torch.Tensor,
-        sampler: Sampler,
+        diffusion_process: DiffusionProcess,
         batched_dist_params: Dict[str, torch.Tensor],
         dist_hparams: Dict[str, Any],
     ) -> torch.Tensor:
         """
-        Computes the velocity estimator E[d/dt xt | xt] at a given time t and input xt, under the data model
+        Computes the velocity estimator E[d/dt x_t | x_t] at a given time t and input x_t, under the data model
 
-        xt = alpha(t) * x0 + sigma(t) * eps
+        x_t = alpha(t) * x_0 + sigma(t) * eps
 
-        where x0 is drawn from the data distribution, and eps is drawn independently from N(0, I).
+        where x_0 is drawn from the data distribution, and eps is drawn independently from N(0, I).
         This is stateless for the same reason as the denoiser method.
 
         Arguments:
-            xt: The input tensor, of shape (N, *D), where *D is the shape of each data.
+            x_t: The input tensor, of shape (N, *D), where *D is the shape of each data.
             t: The time tensor, of shape (N, ).
-            sampler: The sampler whose forward and reverse dynamics determine the time-evolution of the vector fields corresponding to the distribution.
-            batched_dist_params: A dictionary of batched parameters for the distribution. Each parameter is of shape (N, *P) where P is the shape of the parameter.
+            diffusion_process: The diffusion process whose forward and reverse dynamics determine
+                the time-evolution of the vector fields corresponding to the distribution.
+            batched_dist_params: A dictionary of batched parameters for the distribution.
+                Each parameter is of shape (N, *P) where P is the shape of the parameter.
             dist_hparams: A dictionary of hyperparameters for the distribution.
 
         Returns:
-            The prediction of d/dt xt, of shape (N, *D).
+            The prediction of d/dt x_t, of shape (N, *D).
+
+        Note:
+            The batched_dist_params dictionary contains BATCHED tensors, i.e., the first dimension is the batch dimension.
         """
-        x0_hat = cls.x0(xt, t, sampler, batched_dist_params, dist_hparams)
+        x0_hat = cls.x0(x_t, t, diffusion_process, batched_dist_params, dist_hparams)
         v_hat = convert_vector_field_type(
-            xt,
+            x_t,
             x0_hat,
-            sampler.alpha(t),
-            sampler.sigma(t),
-            sampler.alpha_prime(t),
-            sampler.sigma_prime(t),
+            diffusion_process.alpha(t),
+            diffusion_process.sigma(t),
+            diffusion_process.alpha_prime(t),
+            diffusion_process.sigma_prime(t),
             in_type=VectorFieldType.X0,
             out_type=VectorFieldType.V,
         )
@@ -157,38 +179,43 @@ class Distribution:
     @classmethod
     def score(
         cls,
-        xt: torch.Tensor,
+        x_t: torch.Tensor,
         t: torch.Tensor,
-        sampler: Sampler,
+        diffusion_process: DiffusionProcess,
         batched_dist_params: Dict[str, torch.Tensor],
         dist_hparams: Dict[str, Any],
     ) -> torch.Tensor:
         """
-        Computes the score estimator grad_x log p(xt, t) at a given time t and input xt, under the data model
+        Computes the score estimator grad_x log p(x_t, t) at a given time t and input x_t, under the data model
 
-        xt = alpha(t) * x0 + sigma(t) * eps
+        x_t = alpha(t) * x_0 + sigma(t) * eps
 
-        where x0 is drawn from the data distribution, and eps is drawn independently from N(0, I).
+        where x_0 is drawn from the data distribution, and eps is drawn independently from N(0, I).
         This is stateless for the same reason as the denoiser method.
 
         Arguments:
-            xt: The input tensor, of shape (N, *D), where *D is the shape of each data.
+            x_t: The input tensor, of shape (N, *D), where *D is the shape of each data.
             t: The time tensor, of shape (N, ).
-            sampler: The sampler whose forward and reverse dynamics determine the time-evolution of the vector fields corresponding to the distribution.
-            batched_dist_params: A dictionary of batched parameters for the distribution. Each parameter is of shape (N, *P) where P is the shape of the parameter.
+            diffusion_process: The diffusion process whose forward and reverse dynamics determine
+                the time-evolution of the vector fields corresponding to the distribution.
+            batched_dist_params: A dictionary of batched parameters for the distribution.
+                Each parameter is of shape (N, *P) where P is the shape of the parameter.
             dist_hparams: A dictionary of hyperparameters for the distribution.
 
         Returns:
-            The prediction of grad_x log p(xt, t), of shape (N, *D).
+            The prediction of grad_x log p(x_t, t), of shape (N, *D).
+
+        Note:
+            The batched_dist_params dictionary contains BATCHED tensors, i.e., the first dimension is the batch dimension.
         """
-        x0_hat = cls.x0(xt, t, sampler, batched_dist_params, dist_hparams)
+        x0_hat = cls.x0(x_t, t, diffusion_process, batched_dist_params, dist_hparams)
         score_hat = convert_vector_field_type(
-            xt,
+            x_t,
             x0_hat,
-            sampler.alpha(t),
-            sampler.sigma(t),
-            sampler.alpha_prime(t),
-            sampler.sigma_prime(t),
+            diffusion_process.alpha(t),
+            diffusion_process.sigma(t),
+            diffusion_process.alpha_prime(t),
+            diffusion_process.sigma_prime(t),
             in_type=VectorFieldType.X0,
             out_type=VectorFieldType.SCORE,
         )

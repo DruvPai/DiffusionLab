@@ -1,8 +1,9 @@
 import pytest
 import torch
 
+from diffusionlab.diffusions import DiffusionProcess
 from diffusionlab.distributions.base import Distribution
-from diffusionlab.sampler import Sampler
+from diffusionlab.samplers import Sampler
 
 
 class MockSampler(Sampler):
@@ -11,8 +12,10 @@ class MockSampler(Sampler):
     def __init__(self):
         super().__init__(
             is_stochastic=True,
-            alpha=lambda t: torch.ones_like(t),
-            sigma=lambda t: torch.zeros_like(t),
+            diffusion=DiffusionProcess(
+                alpha=lambda t: torch.ones_like(t),
+                sigma=lambda t: torch.zeros_like(t),
+            ),
         )
 
 
@@ -20,8 +23,8 @@ class MockDistribution(Distribution):
     """Mock distribution that implements required methods for testing."""
 
     @classmethod
-    def x0(cls, xt, t, sampler, batched_dist_params, dist_hparams):
-        return xt  # Identity function for testing
+    def x0(cls, x_t, t, diffusion_process, batched_dist_params, dist_hparams):
+        return x_t  # Identity function for testing
 
     @classmethod
     def sample(cls, N, dist_params, dist_hparams):
@@ -50,10 +53,13 @@ def test_validate_params():
 
 def test_unimplemented_methods():
     """Test that unimplemented methods raise NotImplementedError."""
-    sampler = MockSampler()
+    diffusion = DiffusionProcess(
+        alpha=lambda t: torch.ones_like(t),
+        sigma=lambda t: torch.zeros_like(t),
+    )
 
     with pytest.raises(NotImplementedError):
-        Distribution.x0(torch.randn(2, 2), torch.tensor([0.0, 0.0]), sampler, {}, {})
+        Distribution.x0(torch.randn(2, 2), torch.tensor([0.0, 0.0]), diffusion, {}, {})
 
     with pytest.raises(NotImplementedError):
         Distribution.sample(2, {}, {})
@@ -62,23 +68,26 @@ def test_unimplemented_methods():
 def test_vector_field_conversions():
     """Test that vector field conversions work correctly."""
     mock_dist = MockDistribution()
-    sampler = MockSampler()
+    diffusion = DiffusionProcess(
+        alpha=lambda t: torch.ones_like(t),
+        sigma=lambda t: torch.zeros_like(t),
+    )
     batch_size = 2
     dim = 3
 
-    xt = torch.randn(batch_size, dim)
+    x_t = torch.randn(batch_size, dim)
     t = torch.zeros(batch_size)
 
     # Test eps conversion
-    eps = mock_dist.eps(xt, t, sampler, {}, {})
+    eps = mock_dist.eps(x_t, t, diffusion, {}, {})
     assert eps.shape == (batch_size, dim)
 
     # Test v conversion
-    v = mock_dist.v(xt, t, sampler, {}, {})
+    v = mock_dist.v(x_t, t, diffusion, {}, {})
     assert v.shape == (batch_size, dim)
 
     # Test score conversion
-    score = mock_dist.score(xt, t, sampler, {}, {})
+    score = mock_dist.score(x_t, t, diffusion, {}, {})
     assert score.shape == (batch_size, dim)
 
 

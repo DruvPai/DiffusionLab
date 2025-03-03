@@ -17,6 +17,14 @@ class VectorField:
     """
     A wrapper around a function (x, t) -> f(x, t) which provides some extra data,
     namely the type of vector field the function f represents.
+
+    This class encapsulates a vector field function and its type, allowing for
+    consistent handling of different vector field representations in diffusion models.
+
+    Attributes:
+        f (Callable): A function that takes tensors x of shape (N, *D) and t of shape (N,)
+                     and returns a tensor of shape (N, *D).
+        vector_field_type (VectorFieldType): The type of vector field the function represents.
     """
 
     def __init__(
@@ -24,10 +32,30 @@ class VectorField:
         f: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
         vector_field_type: VectorFieldType,
     ):
+        """
+        Initialize a vector field wrapper.
+
+        Args:
+            f: A function that takes tensors x of shape (N, *D) and t of shape (N,)
+               and returns a tensor of shape (N, *D).
+            vector_field_type: The type of vector field the function represents
+                              (SCORE, X0, EPS, or V).
+        """
         self.f: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = f
         self.vector_field_type: VectorFieldType = vector_field_type
 
     def __call__(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        """
+        Call the wrapped vector field function.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (N, *D) where N is the batch size
+                             and D represents the data dimensions.
+            t (torch.Tensor): Time parameter tensor of shape (N,).
+
+        Returns:
+            torch.Tensor: Output of the vector field function, of shape (N, *D).
+        """
         return self.f(x, t)
 
 
@@ -45,7 +73,8 @@ def convert_vector_field_type(
     Converts the output of a vector field from one type to another.
 
     Arguments:
-        x: A tensor of shape (N, *D), where D is the shape of the data (say (C, H, W) for images or (D, ) for vectors or (N, D) for token sequences).
+        x: A tensor of shape (N, *D), where N is the batch size and D is the shape
+           of the data (e.g., (C, H, W) for images, (D,) for vectors, or (N, D) for token sequences).
         fx: The output of the vector field f, of shape (N, *D).
         alpha: A tensor of shape (N,) representing the scale parameter.
         sigma: A tensor of shape (N,) representing the noise level parameter.
@@ -55,7 +84,7 @@ def convert_vector_field_type(
         out_type: The type of the output vector field.
 
     Returns:
-        The converted output of the vector field, of shape (N, *D).
+        torch.Tensor: The converted output of the vector field, of shape (N, *D).
     """
     """
     Derivation:

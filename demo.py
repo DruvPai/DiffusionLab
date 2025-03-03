@@ -3,8 +3,10 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from diffusionlab.distributions.gmm import IsoHomoGMMDistribution
-from diffusionlab.model import DiffusionModel
-from diffusionlab.sampler import FMSampler
+from diffusionlab.models import DiffusionModel
+from diffusionlab.diffusions import FlowMatchingProcess
+from diffusionlab.schedulers import UniformScheduler
+from diffusionlab.samplers import EulerMaruyamaSampler
 from diffusionlab.vector_fields import VectorField, VectorFieldType
 
 lightning.seed_everything(42)
@@ -36,8 +38,13 @@ K = 4
 t_min = 0.01
 t_max = 0.99
 L = 100
+
+stochastic_sampler = False
+
+scheduler = UniformScheduler()
 train_ts_hparams = {"t_min": t_min, "t_max": t_max, "L": L}
-sampler = FMSampler(is_stochastic=False)
+diffusion_process = FlowMatchingProcess()
+sampler = EulerMaruyamaSampler(diffusion_process, stochastic_sampler)
 
 means = torch.randn(K, D) * 3
 var = torch.tensor(0.5)
@@ -60,21 +67,22 @@ val_dataloader = DataLoader(
 M = 100
 net = TConditionedMLP(D, M)
 optimizer = torch.optim.Adam(net.parameters(), lr=1e-3)
-scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
+lr_scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer, factor=1.0)
 
 
 model = DiffusionModel(
     net=net,
-    sampler=sampler,
+    diffusion_process=diffusion_process,
+    train_scheduler=scheduler,
     vector_field_type=VectorFieldType.EPS,
     optimizer=optimizer,
-    lr_scheduler=scheduler,
-    batchwise_val_metrics={},
-    overall_val_metrics={},
+    lr_scheduler=lr_scheduler,
+    batchwise_metrics={},
+    batchfree_metrics={},
     train_ts_hparams=train_ts_hparams,
     t_loss_weights=lambda t: torch.ones_like(t),
     t_loss_probs=lambda t: torch.ones_like(t) / L,
-    N_noise_per_sample=10,
+    N_noise_draws_per_sample=10,
 )
 
 N_epochs = 1000
@@ -84,7 +92,7 @@ trainer.fit(model, train_dataloader, val_dataloader)
 sampling_vector_field = VectorField(model, vector_field_type=model.vector_field_type)
 # sampling_vector_field = VectorField(
 #     lambda x, t: dist.eps(
-#         x, t, sampler, dist.batch_dist_params(x.shape[0], dist_params), {}
+#         x, t, diffusion_process, dist.batch_dist_params(x.shape[0], dist_params), {}
 #     ),
 #     vector_field_type=VectorFieldType.EPS,
 # )  # if you want to use the true eps function
