@@ -79,20 +79,6 @@ def pad_shape_back(x: torch.Tensor, target_shape: torch.Size) -> torch.Tensor:
     return x.view(*x.shape, *expand_dims)
 
 
-def vector_lstsq(A: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
-    """
-    Computes the least-squares solution to the linear equation AX = Y, broadcasting over (A, X, Y).
-
-    Arguments:
-        A: A matrix of shape (..., M, N) where ... represents any number of batch dimensions.
-        Y: A vector or matrix of shape (..., M, K), with the same batch dimensions as A.
-
-    Returns:
-        X: The least-squares solution of shape (..., N, K) with the same batch dimensions as A and Y.
-    """
-    return torch.linalg.lstsq(A, Y).solution
-
-
 def logdet_pd(A: torch.Tensor) -> torch.Tensor:
     """
     Computes the log-determinant of a positive-definite matrix A, broadcasting over A.
