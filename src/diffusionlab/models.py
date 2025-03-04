@@ -270,7 +270,7 @@ class DiffusionModel(LightningModule, VectorField):
                 metric_values[f"{metric_name}_{key}"] = value
         self.log_dict(
             metric_values,
-            on_step=self.LOG_ON_STEP,
+            on_step=False,
             on_epoch=self.LOG_ON_EPOCH,
             prog_bar=self.LOG_ON_PROGRESS_BAR,
         )
