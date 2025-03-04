@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "diffusionlab"
-version = "2.0.0"
+version = "2.0.1"
 description = "Easy no-frills Pytorch implementations of common abstractions for diffusion models."
 readme = "README.md"
 requires-python = ">=3.12"
