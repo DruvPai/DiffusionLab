@@ -515,7 +515,7 @@ class TestDiffusionModel:
             mock_log_dict.assert_called_once()
             args, kwargs = mock_log_dict.call_args
             assert args[0] == {}
-            assert kwargs["on_step"] == model.LOG_ON_STEP
+            assert not kwargs["on_step"]
             assert kwargs["on_epoch"] == model.LOG_ON_EPOCH
             assert kwargs["prog_bar"] == model.LOG_ON_PROGRESS_BAR
 
@@ -579,6 +579,6 @@ class TestDiffusionModel:
             assert set(args[0].keys()) == set(expected_dict.keys())
             for key in expected_dict:
                 assert torch.equal(args[0][key], expected_dict[key])
-            assert kwargs["on_step"] == model.LOG_ON_STEP
+            assert not kwargs["on_step"]
             assert kwargs["on_epoch"] == model.LOG_ON_EPOCH
             assert kwargs["prog_bar"] == model.LOG_ON_PROGRESS_BAR
