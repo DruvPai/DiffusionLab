@@ -515,9 +515,9 @@ class TestDiffusionModel:
             mock_log_dict.assert_called_once()
             args, kwargs = mock_log_dict.call_args
             assert args[0] == {}
-            assert not kwargs["on_step"]
-            assert kwargs["on_epoch"] == model.LOG_ON_EPOCH
-            assert kwargs["prog_bar"] == model.LOG_ON_PROGRESS_BAR
+            assert kwargs["on_step"] == model.LOG_ON_STEP_BATCHFREE_METRICS
+            assert kwargs["on_epoch"] == model.LOG_ON_EPOCH_BATCHFREE_METRICS
+            assert kwargs["prog_bar"] == model.LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS
 
     def test_on_validation_epoch_end_with_metrics(self):
         """Test on_validation_epoch_end method with metrics."""
@@ -579,6 +579,6 @@ class TestDiffusionModel:
             assert set(args[0].keys()) == set(expected_dict.keys())
             for key in expected_dict:
                 assert torch.equal(args[0][key], expected_dict[key])
-            assert not kwargs["on_step"]
-            assert kwargs["on_epoch"] == model.LOG_ON_EPOCH
-            assert kwargs["prog_bar"] == model.LOG_ON_PROGRESS_BAR
+            assert kwargs["on_step"] == model.LOG_ON_STEP_BATCHFREE_METRICS
+            assert kwargs["on_epoch"] == model.LOG_ON_EPOCH_BATCHFREE_METRICS
+            assert kwargs["prog_bar"] == model.LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS

@@ -23,9 +23,6 @@ class DiffusionModel(LightningModule, VectorField):
     algorithms.
 
     Attributes:
-        LOG_ON_STEP (bool): Whether to log metrics on each step.
-        LOG_ON_EPOCH (bool): Whether to log metrics on each epoch.
-        LOG_ON_PROGRESS_BAR (bool): Whether to display metrics on the progress bar.
         net (nn.Module): The neural network that predicts the vector field.
         vector_field_type (VectorFieldType): The type of vector field the model predicts.
         diffusion_process (DiffusionProcess): The diffusion process used for training.
@@ -41,11 +38,28 @@ class DiffusionModel(LightningModule, VectorField):
         train_ts (torch.Tensor): Precomputed time steps for training.
         train_ts_loss_weights (torch.Tensor): Precomputed weights for each time step.
         train_ts_loss_probs (torch.Tensor): Precomputed sampling probabilities for each time step.
+        LOG_ON_STEP_TRAIN_LOSS (bool): Whether to log training loss on each step. Default is True.
+        LOG_ON_EPOCH_TRAIN_LOSS (bool): Whether to log training loss on each epoch. Default is True.
+        LOG_ON_PROGRESS_BAR_TRAIN_LOSS (bool): Whether to display training loss on the progress bar. Default is True.
+        LOG_ON_STEP_BATCHWISE_METRICS (bool): Whether to log batchwise metrics on each step. Default is False.
+        LOG_ON_EPOCH_BATCHWISE_METRICS (bool): Whether to log batchwise metrics on each epoch. Default is True.
+        LOG_ON_PROGRESS_BAR_BATCHWISE_METRICS (bool): Whether to display batchwise metrics on the progress bar. Default is False.
+        LOG_ON_STEP_BATCHFREE_METRICS (bool): Whether to log batchfree metrics on each step. Default is False.
+        LOG_ON_EPOCH_BATCHFREE_METRICS (bool): Whether to log batchfree metrics on each epoch. Default is True.
+        LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS (bool): Whether to display batchfree metrics on the progress bar. Default is False.
     """
 
-    LOG_ON_STEP = True
-    LOG_ON_EPOCH = True
-    LOG_ON_PROGRESS_BAR = True
+    LOG_ON_STEP_TRAIN_LOSS = True
+    LOG_ON_EPOCH_TRAIN_LOSS = True
+    LOG_ON_PROGRESS_BAR_TRAIN_LOSS = True
+
+    LOG_ON_STEP_BATCHWISE_METRICS = False
+    LOG_ON_EPOCH_BATCHWISE_METRICS = True
+    LOG_ON_PROGRESS_BAR_BATCHWISE_METRICS = False
+
+    LOG_ON_STEP_BATCHFREE_METRICS = False
+    LOG_ON_EPOCH_BATCHFREE_METRICS = True
+    LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS = False
 
     def __init__(
         self,
@@ -219,9 +233,9 @@ class DiffusionModel(LightningModule, VectorField):
         self.log(
             "train_loss",
             loss,
-            on_step=self.LOG_ON_STEP,
-            on_epoch=self.LOG_ON_EPOCH,
-            prog_bar=self.LOG_ON_PROGRESS_BAR,
+            on_step=self.LOG_ON_STEP_TRAIN_LOSS,
+            on_epoch=self.LOG_ON_EPOCH_TRAIN_LOSS,
+            prog_bar=self.LOG_ON_PROGRESS_BAR_TRAIN_LOSS,
         )
         return loss
 
@@ -250,9 +264,9 @@ class DiffusionModel(LightningModule, VectorField):
                 metric_values[f"{metric_name}_{key}"] = value
         self.log_dict(
             metric_values,
-            on_step=self.LOG_ON_STEP,
-            on_epoch=self.LOG_ON_EPOCH,
-            prog_bar=self.LOG_ON_PROGRESS_BAR,
+            on_step=self.LOG_ON_STEP_BATCHWISE_METRICS,
+            on_epoch=self.LOG_ON_EPOCH_BATCHWISE_METRICS,
+            prog_bar=self.LOG_ON_PROGRESS_BAR_BATCHWISE_METRICS,
         )
         return metric_values
 
@@ -270,7 +284,7 @@ class DiffusionModel(LightningModule, VectorField):
                 metric_values[f"{metric_name}_{key}"] = value
         self.log_dict(
             metric_values,
-            on_step=False,
-            on_epoch=self.LOG_ON_EPOCH,
-            prog_bar=self.LOG_ON_PROGRESS_BAR,
+            on_step=self.LOG_ON_STEP_BATCHFREE_METRICS,
+            on_epoch=self.LOG_ON_EPOCH_BATCHFREE_METRICS,
+            prog_bar=self.LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS,
         )
