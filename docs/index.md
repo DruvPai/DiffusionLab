@@ -87,7 +87,7 @@ cd DiffusionLab
 ```
 Then (probably in a `conda` environment or a `venv`) install the codebase as a local Pip package, along with the required dependencies:
 ```
-pip install -e ".[dev,docs]"
+pip install .
 ```
 Then feel free to use it! The import is `import diffusionlab`. You can see an example usage in `demo.py`.
 
@@ -107,7 +107,7 @@ Version guide:
 
 Just clone the repository locally using
 ```
-pip install -e .
+pip install -e ".[dev,docs]"
 ```
 make a new branch, and make a PR when you feel ready. Here are a couple quick guidelines:
 - If the function involves nontrivial dimension manipulation, please annotate each tensor with its shape in a comment beside its definition. Examples are found throughout the codebase.
