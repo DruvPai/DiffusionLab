@@ -5,7 +5,7 @@
 
 [Documentation](https://druvpai.github.io/DiffusionLab) • `pip install diffusionlab` 
 
-![Test coverage](https://github.com/druvpai/diffusionlab/actions/workflows/precommit.yml/badge.svg)
+![Tests](https://github.com/druvpai/diffusionlab/actions/workflows/testing.yml/badge.svg) • ![Linting and Formatting](https://github.com/druvpai/diffusionlab/actions/workflows/linting_formatting.yml/badge.svg)
 
 </div>
 
