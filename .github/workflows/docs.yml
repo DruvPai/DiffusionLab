@@ -27,9 +27,14 @@ jobs:
         git config user.name github-actions[bot]
         git config user.email 41898282+github-actions[bot]@users.noreply.github.com
 
-    - name: Generate and upload docs
+    - name: Generate docs files
       run: |
         cd docs
-        uv run python generate_docs.py
-        uv run mkdocs build 
-        uv run mkdocs gh-deploy
+        uv run generate_docs.py
+        cd ..
+    
+    - name: Build docs
+      run: uv run mkdocs build 
+
+    - name: Deploy docs
+      run: uv run mkdocs gh-deploy
