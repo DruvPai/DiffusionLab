@@ -10,3 +10,6 @@ This section provides detailed API documentation for all modules in DiffusionLab
 - [Schedulers](schedulers.md)
 - [Utils](utils.md)
 - [Vector Fields](vector_fields.md)
+
+
+[Summary of API for LLMs](https://raw.githubusercontent.com/DruvPai/DiffusionLab/refs/heads/gh-pages/llms.txt)
