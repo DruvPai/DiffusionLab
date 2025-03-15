@@ -87,7 +87,7 @@ cd DiffusionLab
 ```
 Then (probably in a `conda` environment or a `venv`) install the codebase as a local Pip package, along with the required dependencies:
 ```
-pip install .
+pip install -e ".[dev,docs]"
 ```
 Then feel free to use it! The import is `import diffusionlab`. You can see an example usage in `demo.py`.
 
