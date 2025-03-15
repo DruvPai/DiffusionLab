@@ -138,7 +138,7 @@ class TestVectorFieldConversion:
 
         # Part 1: Test conversions starting from SCORE
         score = torch.randn(batch_size, data_dim)
-        
+
         # Convert score to all other types
         x0_from_score = convert_vector_field_type(
             x,
@@ -173,16 +173,21 @@ class TestVectorFieldConversion:
 
         # Verify consistency equations for score-derived fields
         # x = alpha * x0 + sigma * eps
-        assert torch.allclose(x, alpha.unsqueeze(-1) * x0_from_score + sigma.unsqueeze(-1) * eps_from_score)
+        assert torch.allclose(
+            x,
+            alpha.unsqueeze(-1) * x0_from_score + sigma.unsqueeze(-1) * eps_from_score,
+        )
 
         # v = alpha_prime * x0 + sigma_prime * eps
         assert torch.allclose(
-            v_from_score, alpha_prime.unsqueeze(-1) * x0_from_score + sigma_prime.unsqueeze(-1) * eps_from_score
+            v_from_score,
+            alpha_prime.unsqueeze(-1) * x0_from_score
+            + sigma_prime.unsqueeze(-1) * eps_from_score,
         )
-        
+
         # Part 2: Test conversions starting from EPS
         eps = torch.randn(batch_size, data_dim)
-        
+
         # Test eps to other types and back
         v_from_eps = convert_vector_field_type(
             x,
@@ -205,7 +210,7 @@ class TestVectorFieldConversion:
             VectorFieldType.EPS,
         )
         assert torch.allclose(eps, eps_back)
-        
+
         x0_from_eps = convert_vector_field_type(
             x,
             eps,
@@ -227,19 +232,21 @@ class TestVectorFieldConversion:
             VectorFieldType.EPS,
         )
         assert torch.allclose(eps, eps_back)
-        
+
         # Verify consistency equations for eps-derived fields
         # v = alpha_prime * x0 + sigma_prime * eps
-        v_expected = alpha_prime.unsqueeze(-1) * x0_from_eps + sigma_prime.unsqueeze(-1) * eps
+        v_expected = (
+            alpha_prime.unsqueeze(-1) * x0_from_eps + sigma_prime.unsqueeze(-1) * eps
+        )
         assert torch.allclose(v_from_eps, v_expected)
-        
+
         # x = alpha * x0 + sigma * eps
         x_expected = alpha.unsqueeze(-1) * x0_from_eps + sigma.unsqueeze(-1) * eps
         assert torch.allclose(x, x_expected)
-        
+
         # Part 3: Test conversions starting from V
         v = torch.randn(batch_size, data_dim)
-        
+
         # Test v to other types and back
         eps_from_v = convert_vector_field_type(
             x,
@@ -262,7 +269,7 @@ class TestVectorFieldConversion:
             VectorFieldType.V,
         )
         assert torch.allclose(v, v_back)
-        
+
         x0_from_v = convert_vector_field_type(
             x,
             v,
@@ -284,19 +291,22 @@ class TestVectorFieldConversion:
             VectorFieldType.V,
         )
         assert torch.allclose(v, v_back)
-        
+
         # Verify consistency equations for v-derived fields
         # v = alpha_prime * x0 + sigma_prime * eps
-        v_expected = alpha_prime.unsqueeze(-1) * x0_from_v + sigma_prime.unsqueeze(-1) * eps_from_v
+        v_expected = (
+            alpha_prime.unsqueeze(-1) * x0_from_v
+            + sigma_prime.unsqueeze(-1) * eps_from_v
+        )
         assert torch.allclose(v, v_expected)
-        
+
         # x = alpha * x0 + sigma * eps
         x_expected = alpha.unsqueeze(-1) * x0_from_v + sigma.unsqueeze(-1) * eps_from_v
         assert torch.allclose(x, x_expected)
-        
+
         # Part 4: Test conversions starting from X0
         x0 = torch.randn(batch_size, data_dim)
-        
+
         # Test x0 to other types and back
         eps_from_x0 = convert_vector_field_type(
             x,
@@ -319,7 +329,7 @@ class TestVectorFieldConversion:
             VectorFieldType.X0,
         )
         assert torch.allclose(x0, x0_back)
-        
+
         v_from_x0 = convert_vector_field_type(
             x,
             x0,
@@ -341,12 +351,14 @@ class TestVectorFieldConversion:
             VectorFieldType.X0,
         )
         assert torch.allclose(x0, x0_back)
-        
+
         # Verify consistency equations for x0-derived fields
         # v = alpha_prime * x0 + sigma_prime * eps
-        v_expected = alpha_prime.unsqueeze(-1) * x0 + sigma_prime.unsqueeze(-1) * eps_from_x0
+        v_expected = (
+            alpha_prime.unsqueeze(-1) * x0 + sigma_prime.unsqueeze(-1) * eps_from_x0
+        )
         assert torch.allclose(v_from_x0, v_expected)
-        
+
         # x = alpha * x0 + sigma * eps
         x_expected = alpha.unsqueeze(-1) * x0 + sigma.unsqueeze(-1) * eps_from_x0
         assert torch.allclose(x, x_expected)
