@@ -3,7 +3,7 @@
 
 ![DiffusionLab Logo](docs/diffusionlab_logo.svg)
 
-[Documentation](https://druvpai.github.io/DiffusionLab) • `pip install diffusionlab` 
+[Documentation](https://druvpai.github.io/DiffusionLab) • `pip install diffusionlab` • [`llms.txt`](https://raw.githubusercontent.com/DruvPai/DiffusionLab/refs/heads/gh-pages/llms.txt)
 
 ![Tests](https://github.com/druvpai/diffusionlab/actions/workflows/testing.yml/badge.svg) • ![Linting and Formatting](https://github.com/druvpai/diffusionlab/actions/workflows/linting_formatting.yml/badge.svg)
 
