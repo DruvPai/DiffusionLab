@@ -1,0 +1,18 @@
+---
+description: Cursor rules for writing tests.
+globs: tests/**/*.py
+alwaysApply: false
+---
+
+# Principles for Code Testing
+
+Unit test principles:
+- When developing tests, first list all existing tests and things that are not tested.
+- Each code class should correspond to at least one test class.
+- Each test should belong to a test class.
+- Each major piece of code should have correctness tests using a reference implementation. It is OK if the reference implementation is (very) slow and not vectorized as long as it is easy to understand that it's correct.
+- Each test should be entirely self-contained and not use any fixtures or anything outside that test, EXCEPT for reference implementations.
+- All tests should use the pytest framework. Do NOT use unittest framework.
+- Don't use any mocks or monkeypatching. If you want to mock a response, just initialize the real object and call it.
+- Keep test files under 1000 lines, possibly by breaking up collections of tests into different classes which can go into different files.
+Make sure that you ALWAYS run the tests and iterate on them until they pass.

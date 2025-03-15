@@ -23,7 +23,7 @@ class VectorField:
 
     Attributes:
         f (Callable): A function that takes tensors x of shape (N, *D) and t of shape (N,)
-                     and returns a tensor of shape (N, *D).
+            and returns a tensor of shape (N, *D).
         vector_field_type (VectorFieldType): The type of vector field the function represents.
     """
 
@@ -36,10 +36,10 @@ class VectorField:
         Initialize a vector field wrapper.
 
         Args:
-            f: A function that takes tensors x of shape (N, *D) and t of shape (N,)
-               and returns a tensor of shape (N, *D).
-            vector_field_type: The type of vector field the function represents
-                              (SCORE, X0, EPS, or V).
+            f (Callable[[torch.Tensor, torch.Tensor], torch.Tensor]): A function that takes tensors x of shape (N, *D) and t of shape (N,)
+                and returns a tensor of shape (N, *D).
+            vector_field_type (VectorFieldType): The type of vector field the function represents
+                                (SCORE, X0, EPS, or V).
         """
         self.f: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = f
         self.vector_field_type: VectorFieldType = vector_field_type
@@ -49,8 +49,7 @@ class VectorField:
         Call the wrapped vector field function.
 
         Args:
-            x (torch.Tensor): Input tensor of shape (N, *D) where N is the batch size
-                             and D represents the data dimensions.
+            x (torch.Tensor): Input tensor of shape (N, *D) where N is the batch size and D represents the data dimensions.
             t (torch.Tensor): Time parameter tensor of shape (N,).
 
         Returns:
@@ -73,15 +72,15 @@ def convert_vector_field_type(
     Converts the output of a vector field from one type to another.
 
     Arguments:
-        x: A tensor of shape (N, *D), where N is the batch size and D is the shape
+        x (torch.Tensor): A tensor of shape (N, *D), where N is the batch size and D is the shape
            of the data (e.g., (C, H, W) for images, (D,) for vectors, or (N, D) for token sequences).
-        fx: The output of the vector field f, of shape (N, *D).
-        alpha: A tensor of shape (N,) representing the scale parameter.
-        sigma: A tensor of shape (N,) representing the noise level parameter.
-        alpha_prime: A tensor of shape (N,) representing the scale derivative parameter.
-        sigma_prime: A tensor of shape (N,) representing the noise level derivative parameter.
-        in_type: The type of the input vector field (e.g. Score, X0, Eps, V).
-        out_type: The type of the output vector field.
+        fx (torch.Tensor): The output of the vector field f, of shape (N, *D).
+        alpha (torch.Tensor): A tensor of shape (N,) representing the scale parameter.
+        sigma (torch.Tensor): A tensor of shape (N,) representing the noise level parameter.
+        alpha_prime (torch.Tensor): A tensor of shape (N,) representing the scale derivative parameter.
+        sigma_prime (torch.Tensor): A tensor of shape (N,) representing the noise level derivative parameter.
+        in_type (VectorFieldType): The type of the input vector field (e.g. Score, X0, Eps, V).
+        out_type (VectorFieldType): The type of the output vector field.
 
     Returns:
         torch.Tensor: The converted output of the vector field, of shape (N, *D).

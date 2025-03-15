@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "diffusionlab"
-version = "2.0.3"
+version = "2.0.4"
 description = "Easy no-frills Pytorch implementations of common abstractions for diffusion models."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,14 @@ dependencies = [
     "pytest>=8.3.4",
     "ruff>=0.9.3",
     "torch>=2.5.1",
+]
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.8",
+    "mkdocstrings>=0.29.0",
+    "mkdocstrings-python>=1.16.5",
 ]
 
 [tool.hatch.build.targets.wheel]

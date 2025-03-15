@@ -1,0 +1,33 @@
+---
+description: Cursor rules for writing and documenting code.
+globs: *.py
+alwaysApply: false
+---
+
+# Principles for Code Generation and Documentation
+
+Code generation principles:
+- Always think step-by-step to reason about the most elegant and readable way to accomplish the task. 
+- Take into account that this is a research codebase, so code should be easy to modify and extend.
+- If a solution is many times more efficient, it's worth strongly considering even if a little less readable. 
+  - An unreadable solution is never good even if it's fast. 
+- If a PyTorch or Jax function is potentially vectorizable, think step-by-step about how to vectorize it. 
+  - Vectorized implementations are strongly preferred as they're usually faster.
+- For ease of readability, use type-hints (at least for class attributes and function arguments and return values).
+- For Array/Tensor-valued attributes/variables/parameters/etc, annotate the expected shape in inline comments, for example `(batch_size, feature_dim)`.
+- For function-valued attributes/variables/parameters/etc, annotate the input/output types (and shapes if applicable) in inline comments.
+- Keep code files under 1000 lines, possibly by breaking up code into different classes which can go into different files.
+
+Code documentation principles:
+- Document all functions and classes. 
+- Classes should be documented by their purpose and all their attributes.
+- All variables/attributes/parameters/etc should be annotated by their type in the docstrings.
+- All Array/Tensor-valued attributes/variables/parameters/etc should be annotated by their type and expected shape in the docstrings.
+- All function-valued attributes/variables/parameters/etc should be annotated by their input and output types (and expected shapes, if applicable) in the docstrings.
+- Make any assumptions about the input explicit and clear in the docstring, especially if it is hard to test for these assumptions efficiently.
+- Whenever you change code, consider updating the documentation accordingly.
+
+For type annotations:
+- Use T | None instead of Optional[T]
+- Use S | T instead of Union[S, T]
+  
