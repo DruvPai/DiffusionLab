@@ -10,8 +10,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "lightning>=2.5.0.post0",
-    "pytest>=8.3.4",
-    "ruff>=0.9.3",
     "torch>=2.5.1",
 ]
 
@@ -21,6 +19,12 @@ docs = [
     "mkdocs-material>=9.6.8",
     "mkdocstrings>=0.29.0",
     "mkdocstrings-python>=1.16.5",
+]
+dev = [
+    "coverage>=7.6.12",
+    "pytest>=8.3.5",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.11.0",
 ]
 
 [tool.hatch.build.targets.wheel]

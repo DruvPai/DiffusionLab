@@ -22,11 +22,5 @@ jobs:
     - name: Install the project
       run: uv sync --all-extras --dev
 
-    - name: Run Ruff linter
-      run: uv run ruff check --output-format=github .
-
     - name: Run Ruff formatter
       run: uv run ruff format .
-
-    - name: Run tests
-      run: uv run pytest tests
