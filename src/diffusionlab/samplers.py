@@ -23,7 +23,7 @@ class Sampler:
     both stochastic and deterministic sampling.
 
     Attributes:
-        diffusion (DiffusionProcess): The diffusion process defining the forward and reverse dynamics
+        diffusion_process (DiffusionProcess): The diffusion process defining the forward and reverse dynamics
         is_stochastic (bool): Whether the reverse process is stochastic or deterministic
     """
 
@@ -36,7 +36,7 @@ class Sampler:
         Initialize a sampler with a diffusion process and sampling strategy.
 
         Args:
-            diffusion (DiffusionProcess): The diffusion process to use for sampling
+            diffusion_process (DiffusionProcess): The diffusion process to use for sampling
             is_stochastic (bool): Whether the reverse process should be stochastic
         """
         self.diffusion_process: DiffusionProcess = diffusion_process
@@ -45,7 +45,7 @@ class Sampler:
     def sample(
         self,
         vector_field: VectorField,
-        x_t: torch.Tensor,
+        x_init: torch.Tensor,
         zs: torch.Tensor,
         ts: torch.Tensor,
     ) -> torch.Tensor:
@@ -57,8 +57,7 @@ class Sampler:
 
         Args:
             vector_field (VectorField): The vector field model to use for sampling
-            x_t (torch.Tensor): The initial noisy tensor to start sampling from, of shape (N, *D)
-                where N is the batch size and D represents the data dimensions
+            x_init (torch.Tensor): The initial noisy tensor to start sampling from, of shape (N, *D) where N is the batch size and D represents the data dimensions
             zs (torch.Tensor): The noise tensors for stochastic sampling, of shape (L-1, N, *D)
                 where L is the number of time steps
             ts (torch.Tensor): The time schedule for sampling, of shape (L,)
@@ -70,7 +69,7 @@ class Sampler:
         sample_step_function = self.get_sample_step_function(
             vector_field.vector_field_type
         )
-        x = x_t
+        x = x_init
         for i in range(ts.shape[0] - 1):
             x = sample_step_function(vector_field, x, zs, i, ts)
         return x
@@ -78,7 +77,7 @@ class Sampler:
     def sample_trajectory(
         self,
         vector_field: VectorField,
-        x_t: torch.Tensor,
+        x_init: torch.Tensor,
         zs: torch.Tensor,
         ts: torch.Tensor,
     ) -> torch.Tensor:
@@ -90,7 +89,7 @@ class Sampler:
 
         Args:
             vector_field (VectorField): The vector field model to use for sampling
-            x_t (torch.Tensor): The initial noisy tensor to start sampling from, of shape (N, *D)
+            x_init (torch.Tensor): The initial noisy tensor to start sampling from, of shape (N, *D)
                 where N is the batch size and D represents the data dimensions
             zs (torch.Tensor): The noise tensors for stochastic sampling, of shape (L-1, N, *D)
                 where L is the number of time steps
@@ -104,8 +103,8 @@ class Sampler:
         sample_step_function = self.get_sample_step_function(
             vector_field.vector_field_type
         )
-        xs = [x_t]
-        x = x_t
+        xs = [x_init]
+        x = x_init
         for i in range(ts.shape[0] - 1):
             x = sample_step_function(vector_field, x, zs, i, ts)
             xs.append(x)
