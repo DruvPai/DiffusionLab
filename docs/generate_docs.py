@@ -44,7 +44,9 @@ def generate_docs_for_package(package_name, docs_dir="."):
             title = simple_name.replace("_", " ").title()
             f.write(f"- [{title}]({simple_name}.md)\n")
 
-        f.write("\n[Summary of API for LLMs](https://github.com/DruvPai/DiffusionLab/blob/gh-pages/llms.txt)")
+        f.write(
+            "\n[Summary of API for LLMs](https://github.com/DruvPai/DiffusionLab/blob/gh-pages/llms.txt)"
+        )
 
     # Create individual module documentation files
     for module_name, is_pkg in modules:
