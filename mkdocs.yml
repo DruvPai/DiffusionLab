@@ -26,7 +26,7 @@ plugins:
             - "^__"
   - llmstxt:
       files:
-      - output: api/llms.txt
+      - output: llms.txt
         inputs:
         - api/*.md
 
