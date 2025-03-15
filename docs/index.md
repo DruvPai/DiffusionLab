@@ -4,7 +4,7 @@
   <img src="diffusionlab_logo.svg" alt="DiffusionLab Logo">
   
   <p>
-    <a href="https://github.com/DruvPai/DiffusionLab">GitHub</a> • <code>pip install diffusionlab</code>
+    <a href="https://github.com/DruvPai/DiffusionLab">GitHub</a> • <code>pip install diffusionlab</code> • <a href="https://raw.githubusercontent.com/DruvPai/DiffusionLab/refs/heads/gh-pages/llms.txt"><code>llms.txt</code></a>
   </p>
   
   <img src="https://github.com/druvpai/diffusionlab/actions/workflows/testing.yml/badge.svg" alt="Tests "> • <img src="https://github.com/druvpai/diffusionlab/actions/workflows/linting_formatting.yml/badge.svg" alt="Linting and Formatting">
