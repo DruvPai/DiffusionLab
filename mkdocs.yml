@@ -24,6 +24,11 @@ plugins:
             filters:
             - "!^_"
             - "^__"
+  - llmstxt:
+      files:
+      - output: llms.txt
+        inputs:
+        - api/*.md
 
 nav:
   - Home: index.md
