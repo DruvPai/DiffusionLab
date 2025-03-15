@@ -23,5 +23,5 @@ jobs:
       run: uv sync --all-extras --dev
 
     - name: Run tests
-      run: uv run pytest tests --cov=src --cov-report
+      run: uv run pytest tests --cov=src
 
