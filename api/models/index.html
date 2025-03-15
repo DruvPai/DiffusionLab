@@ -1,0 +1,2292 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for the DiffusionLab package">
+      
+      
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.8">
+    
+    
+      
+        <title>Models - DiffusionLab Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8608ea7d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#models" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="DiffusionLab Documentation" class="md-header__button md-logo" aria-label="DiffusionLab Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            DiffusionLab Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Models
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="DiffusionLab Documentation" class="md-nav__button md-logo" aria-label="DiffusionLab Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    DiffusionLab Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#diffusionlab.models" class="md-nav__link">
+    <span class="md-ellipsis">
+      models
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel" class="md-nav__link">
+    <span class="md-ellipsis">
+      DiffusionModel
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DiffusionModel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_BATCHFREE_METRICS" class="md-nav__link">
+    <span class="md-ellipsis">
+      LOG_ON_EPOCH_BATCHFREE_METRICS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_BATCHWISE_METRICS" class="md-nav__link">
+    <span class="md-ellipsis">
+      LOG_ON_EPOCH_BATCHWISE_METRICS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_TRAIN_LOSS" class="md-nav__link">
+    <span class="md-ellipsis">
+      LOG_ON_EPOCH_TRAIN_LOSS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS" class="md-nav__link">
+    <span class="md-ellipsis">
+      LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_BATCHWISE_METRICS" class="md-nav__link">
+    <span class="md-ellipsis">
+      LOG_ON_PROGRESS_BAR_BATCHWISE_METRICS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_TRAIN_LOSS" class="md-nav__link">
+    <span class="md-ellipsis">
+      LOG_ON_PROGRESS_BAR_TRAIN_LOSS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.LOG_ON_STEP_BATCHFREE_METRICS" class="md-nav__link">
+    <span class="md-ellipsis">
+      LOG_ON_STEP_BATCHFREE_METRICS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.LOG_ON_STEP_BATCHWISE_METRICS" class="md-nav__link">
+    <span class="md-ellipsis">
+      LOG_ON_STEP_BATCHWISE_METRICS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.LOG_ON_STEP_TRAIN_LOSS" class="md-nav__link">
+    <span class="md-ellipsis">
+      LOG_ON_STEP_TRAIN_LOSS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.N_noise_draws_per_sample" class="md-nav__link">
+    <span class="md-ellipsis">
+      N_noise_draws_per_sample
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.batchfree_metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      batchfree_metrics
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.batchwise_metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      batchwise_metrics
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.diffusion_process" class="md-nav__link">
+    <span class="md-ellipsis">
+      diffusion_process
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.lr_scheduler" class="md-nav__link">
+    <span class="md-ellipsis">
+      lr_scheduler
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.net" class="md-nav__link">
+    <span class="md-ellipsis">
+      net
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.optimizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      optimizer
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.samplewise_loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      samplewise_loss
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.t_loss_probs" class="md-nav__link">
+    <span class="md-ellipsis">
+      t_loss_probs
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.t_loss_weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      t_loss_weights
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.train_scheduler" class="md-nav__link">
+    <span class="md-ellipsis">
+      train_scheduler
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.vector_field_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      vector_field_type
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      __init__
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.aggregate_loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      aggregate_loss
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.configure_optimizers" class="md-nav__link">
+    <span class="md-ellipsis">
+      configure_optimizers
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.forward" class="md-nav__link">
+    <span class="md-ellipsis">
+      forward
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      loss
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.on_validation_epoch_end" class="md-nav__link">
+    <span class="md-ellipsis">
+      on_validation_epoch_end
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.precompute_train_schedule" class="md-nav__link">
+    <span class="md-ellipsis">
+      precompute_train_schedule
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.training_step" class="md-nav__link">
+    <span class="md-ellipsis">
+      training_step
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diffusionlab.models.DiffusionModel.validation_step" class="md-nav__link">
+    <span class="md-ellipsis">
+      validation_step
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="models">Models</h1>
+<p>This module contains functionality related to models.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<a id="diffusionlab.models"></a>
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="diffusionlab.models.DiffusionModel" class="doc doc-heading">
+            <code>DiffusionModel</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="lightning.LightningModule">LightningModule</span></code>, <code><a class="autorefs autorefs-internal" title="VectorField (diffusionlab.vector_fields.VectorField)" href="../vector_fields/#diffusionlab.vector_fields.VectorField">VectorField</a></code></p>
+
+
+        <p>A PyTorch Lightning module for training and evaluating diffusion models.</p>
+<p>This class implements a diffusion model that can be trained using various vector field types
+(score, x0, eps, v) and diffusion processes. It handles the training loop, loss computation,
+and evaluation metrics.</p>
+<p>The model inherits from both LightningModule (for training) and VectorField (for sampling),
+making it compatible with both the Lightning training framework and the diffusion sampling
+algorithms.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="net = net
+
+  
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.net)" href="#diffusionlab.models.DiffusionModel.net">net</a></code></td>
+            <td>
+                  <code><span title="torch.nn.Module">Module</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The neural network that predicts the vector field.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="vector_field_type = vector_field_type
+
+  
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.vector_field_type)" href="#diffusionlab.models.DiffusionModel.vector_field_type">vector_field_type</a></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="VectorFieldType (diffusionlab.vector_fields.VectorFieldType)" href="../vector_fields/#diffusionlab.vector_fields.VectorFieldType">VectorFieldType</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The type of vector field the model predicts.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="diffusion_process = diffusion_process
+
+  
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.diffusion_process)" href="#diffusionlab.models.DiffusionModel.diffusion_process">diffusion_process</a></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="DiffusionProcess (diffusionlab.diffusions.DiffusionProcess)" href="../diffusions/#diffusionlab.diffusions.DiffusionProcess">DiffusionProcess</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The diffusion process used for training.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="train_scheduler = train_scheduler
+
+  
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.train_scheduler)" href="#diffusionlab.models.DiffusionModel.train_scheduler">train_scheduler</a></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Scheduler (diffusionlab.schedulers.Scheduler)" href="../schedulers/#diffusionlab.schedulers.Scheduler">Scheduler</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The scheduler for generating training time steps.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="optimizer = optimizer
+
+  
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.optimizer)" href="#diffusionlab.models.DiffusionModel.optimizer">optimizer</a></code></td>
+            <td>
+                  <code><span title="torch.optim.Optimizer">Optimizer</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The optimizer for training the model.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="lr_scheduler = lr_scheduler
+
+  
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.lr_scheduler)" href="#diffusionlab.models.DiffusionModel.lr_scheduler">lr_scheduler</a></code></td>
+            <td>
+                  <code><span title="torch.optim.lr_scheduler.LRScheduler">LRScheduler</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The learning rate scheduler.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="batchwise_metrics = nn.ModuleDict(batchwise_metrics)
+
+  
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.batchwise_metrics)" href="#diffusionlab.models.DiffusionModel.batchwise_metrics">batchwise_metrics</a></code></td>
+            <td>
+                  <code><span title="torch.nn.ModuleDict">ModuleDict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Metrics computed on each batch during validation.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="batchfree_metrics = nn.ModuleDict(batchfree_metrics)
+
+  
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.batchfree_metrics)" href="#diffusionlab.models.DiffusionModel.batchfree_metrics">batchfree_metrics</a></code></td>
+            <td>
+                  <code><span title="torch.nn.ModuleDict">ModuleDict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Metrics computed at the end of validation epoch.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="t_loss_weights = t_loss_weights
+
+  
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.t_loss_weights)" href="#diffusionlab.models.DiffusionModel.t_loss_weights">t_loss_weights</a></code></td>
+            <td>
+                  <code><span title="typing.Callable">Callable</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Function that weights loss at different time steps.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="t_loss_probs = t_loss_probs
+
+  
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.t_loss_probs)" href="#diffusionlab.models.DiffusionModel.t_loss_probs">t_loss_probs</a></code></td>
+            <td>
+                  <code><span title="typing.Callable">Callable</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Function that determines sampling probability of time steps.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="diffusionlab.models.DiffusionModel.N_noise_per_sample">N_noise_per_sample</span></code></td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of noise samples per data point.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="samplewise_loss = SamplewiseDiffusionLoss(diffusion_process, vector_field_type)
+
+  
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.samplewise_loss)" href="#diffusionlab.models.DiffusionModel.samplewise_loss">samplewise_loss</a></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="SamplewiseDiffusionLoss (diffusionlab.losses.SamplewiseDiffusionLoss)" href="../losses/#diffusionlab.losses.SamplewiseDiffusionLoss">SamplewiseDiffusionLoss</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Loss function for each sample.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="diffusionlab.models.DiffusionModel.train_ts">train_ts</span></code></td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Precomputed time steps for training.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="diffusionlab.models.DiffusionModel.train_ts_loss_weights">train_ts_loss_weights</span></code></td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Precomputed weights for each time step.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="diffusionlab.models.DiffusionModel.train_ts_loss_probs">train_ts_loss_probs</span></code></td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Precomputed sampling probabilities for each time step.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="LOG_ON_STEP_TRAIN_LOSS = True
+
+  
+      class-attribute
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.LOG_ON_STEP_TRAIN_LOSS)" href="#diffusionlab.models.DiffusionModel.LOG_ON_STEP_TRAIN_LOSS">LOG_ON_STEP_TRAIN_LOSS</a></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to log training loss on each step. Default is True.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="LOG_ON_EPOCH_TRAIN_LOSS = True
+
+  
+      class-attribute
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_TRAIN_LOSS)" href="#diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_TRAIN_LOSS">LOG_ON_EPOCH_TRAIN_LOSS</a></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to log training loss on each epoch. Default is True.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="LOG_ON_PROGRESS_BAR_TRAIN_LOSS = True
+
+  
+      class-attribute
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_TRAIN_LOSS)" href="#diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_TRAIN_LOSS">LOG_ON_PROGRESS_BAR_TRAIN_LOSS</a></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to display training loss on the progress bar. Default is True.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="LOG_ON_STEP_BATCHWISE_METRICS = False
+
+  
+      class-attribute
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.LOG_ON_STEP_BATCHWISE_METRICS)" href="#diffusionlab.models.DiffusionModel.LOG_ON_STEP_BATCHWISE_METRICS">LOG_ON_STEP_BATCHWISE_METRICS</a></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to log batchwise metrics on each step. Default is False.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="LOG_ON_EPOCH_BATCHWISE_METRICS = True
+
+  
+      class-attribute
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_BATCHWISE_METRICS)" href="#diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_BATCHWISE_METRICS">LOG_ON_EPOCH_BATCHWISE_METRICS</a></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to log batchwise metrics on each epoch. Default is True.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="LOG_ON_PROGRESS_BAR_BATCHWISE_METRICS = False
+
+  
+      class-attribute
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_BATCHWISE_METRICS)" href="#diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_BATCHWISE_METRICS">LOG_ON_PROGRESS_BAR_BATCHWISE_METRICS</a></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to display batchwise metrics on the progress bar. Default is False.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="LOG_ON_STEP_BATCHFREE_METRICS = False
+
+  
+      class-attribute
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.LOG_ON_STEP_BATCHFREE_METRICS)" href="#diffusionlab.models.DiffusionModel.LOG_ON_STEP_BATCHFREE_METRICS">LOG_ON_STEP_BATCHFREE_METRICS</a></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to log batchfree metrics on each step. Default is False.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="LOG_ON_EPOCH_BATCHFREE_METRICS = True
+
+  
+      class-attribute
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_BATCHFREE_METRICS)" href="#diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_BATCHFREE_METRICS">LOG_ON_EPOCH_BATCHFREE_METRICS</a></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to log batchfree metrics on each epoch. Default is True.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><a class="autorefs autorefs-internal" title="LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS = False
+
+  
+      class-attribute
+      instance-attribute
+   (diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS)" href="#diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS">LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS</a></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to display batchfree metrics on the progress bar. Default is False.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_BATCHFREE_METRICS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">LOG_ON_EPOCH_BATCHFREE_METRICS</span> <span class="o">=</span> <span class="kc">True</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_BATCHWISE_METRICS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">LOG_ON_EPOCH_BATCHWISE_METRICS</span> <span class="o">=</span> <span class="kc">True</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.LOG_ON_EPOCH_TRAIN_LOSS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">LOG_ON_EPOCH_TRAIN_LOSS</span> <span class="o">=</span> <span class="kc">True</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS</span> <span class="o">=</span> <span class="kc">False</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_BATCHWISE_METRICS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">LOG_ON_PROGRESS_BAR_BATCHWISE_METRICS</span> <span class="o">=</span> <span class="kc">False</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.LOG_ON_PROGRESS_BAR_TRAIN_LOSS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">LOG_ON_PROGRESS_BAR_TRAIN_LOSS</span> <span class="o">=</span> <span class="kc">True</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.LOG_ON_STEP_BATCHFREE_METRICS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">LOG_ON_STEP_BATCHFREE_METRICS</span> <span class="o">=</span> <span class="kc">False</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.LOG_ON_STEP_BATCHWISE_METRICS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">LOG_ON_STEP_BATCHWISE_METRICS</span> <span class="o">=</span> <span class="kc">False</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.LOG_ON_STEP_TRAIN_LOSS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">LOG_ON_STEP_TRAIN_LOSS</span> <span class="o">=</span> <span class="kc">True</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.N_noise_draws_per_sample" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">N_noise_draws_per_sample</span> <span class="o">=</span> <span class="n">N_noise_draws_per_sample</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.batchfree_metrics" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">batchfree_metrics</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleDict</span><span class="p">(</span><span class="n">batchfree_metrics</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.batchwise_metrics" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">batchwise_metrics</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleDict</span><span class="p">(</span><span class="n">batchwise_metrics</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.diffusion_process" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">diffusion_process</span> <span class="o">=</span> <span class="n">diffusion_process</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.lr_scheduler" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">lr_scheduler</span> <span class="o">=</span> <span class="n">lr_scheduler</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.net" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">net</span> <span class="o">=</span> <span class="n">net</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.optimizer" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">optimizer</span> <span class="o">=</span> <span class="n">optimizer</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.samplewise_loss" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">samplewise_loss</span> <span class="o">=</span> <span class="n">SamplewiseDiffusionLoss</span><span class="p">(</span><span class="n">diffusion_process</span><span class="p">,</span> <span class="n">vector_field_type</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.t_loss_probs" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">t_loss_probs</span> <span class="o">=</span> <span class="n">t_loss_probs</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.t_loss_weights" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">t_loss_weights</span> <span class="o">=</span> <span class="n">t_loss_weights</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.train_scheduler" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">train_scheduler</span> <span class="o">=</span> <span class="n">train_scheduler</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="diffusionlab.models.DiffusionModel.vector_field_type" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">vector_field_type</span> <span class="o">=</span> <span class="n">vector_field_type</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="diffusionlab.models.DiffusionModel.__init__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__init__</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">diffusion_process</span><span class="p">,</span> <span class="n">train_scheduler</span><span class="p">,</span> <span class="n">vector_field_type</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">,</span> <span class="n">lr_scheduler</span><span class="p">,</span> <span class="n">batchwise_metrics</span><span class="p">,</span> <span class="n">batchfree_metrics</span><span class="p">,</span> <span class="n">train_ts_hparams</span><span class="p">,</span> <span class="n">t_loss_weights</span><span class="p">,</span> <span class="n">t_loss_probs</span><span class="p">,</span> <span class="n">N_noise_draws_per_sample</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Initialize the diffusion model.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>net</code>
+            </td>
+            <td>
+                  <code><span title="torch.nn.Module">Module</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Neural network that predicts the vector field.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>diffusion_process</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="DiffusionProcess (diffusionlab.diffusions.DiffusionProcess)" href="../diffusions/#diffusionlab.diffusions.DiffusionProcess">DiffusionProcess</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The diffusion process used for training.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>train_scheduler</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Scheduler (diffusionlab.schedulers.Scheduler)" href="../schedulers/#diffusionlab.schedulers.Scheduler">Scheduler</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Scheduler for generating training time steps.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>vector_field_type</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="VectorFieldType (diffusionlab.vector_fields.VectorFieldType)" href="../vector_fields/#diffusionlab.vector_fields.VectorFieldType">VectorFieldType</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Type of vector field the model predicts.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>optimizer</code>
+            </td>
+            <td>
+                  <code><span title="torch.optim.Optimizer">Optimizer</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optimizer for training the model.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>lr_scheduler</code>
+            </td>
+            <td>
+                  <code><span title="torch.optim.lr_scheduler.LRScheduler">LRScheduler</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Learning rate scheduler.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>batchwise_metrics</code>
+            </td>
+            <td>
+                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="torch.nn.Module">Module</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Metrics computed on each batch during validation. Each metric takes in (x, metadata, model) and returns a dictionary of metric (name, value) pairs.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>batchfree_metrics</code>
+            </td>
+            <td>
+                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="torch.nn.Module">Module</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Metrics computed at the end of validation epoch. Each metric takes in (model) and returns a dictionary of metric (name, value) pairs.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>train_ts_hparams</code>
+            </td>
+            <td>
+                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parameters for the training time step scheduler.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>t_loss_weights</code>
+            </td>
+            <td>
+                  <code><span title="typing.Callable">Callable</span>[[<span title="torch.Tensor">Tensor</span>], <span title="torch.Tensor">Tensor</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Function that weights loss at different time steps.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>t_loss_probs</code>
+            </td>
+            <td>
+                  <code><span title="typing.Callable">Callable</span>[[<span title="torch.Tensor">Tensor</span>], <span title="torch.Tensor">Tensor</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Function that determines sampling probability of time steps.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>N_noise_draws_per_sample</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of noise draws per data point.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="diffusionlab.models.DiffusionModel.aggregate_loss" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">aggregate_loss</span><span class="p">(</span><span class="n">x</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the loss for a batch of data with randomly sampled time steps.</p>
+<p>This method:
+1. Samples time steps according to the training distribution
+2. Computes the loss at those time steps</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>x</code>
+            </td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Input data of shape (batch_size, *data_dims).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>torch.Tensor: Scalar loss value.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="diffusionlab.models.DiffusionModel.configure_optimizers" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">configure_optimizers</span><span class="p">()</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Configure optimizers and learning rate schedulers for training.</p>
+<p>This method is called by PyTorch Lightning to set up the optimization process.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>OptimizerLRScheduler</code></td>            <td>
+                  <code><span title="lightning.pytorch.utilities.types.OptimizerLRScheduler">OptimizerLRScheduler</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dictionary containing the optimizer and learning rate scheduler.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="diffusionlab.models.DiffusionModel.forward" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">forward</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Forward pass of the model.</p>
+<p>Passes the input through the neural network to predict the vector field.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>x</code>
+            </td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Input tensor of shape (batch_size, *data_dims).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>t</code>
+            </td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Time tensor of shape (batch_size,).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>torch.Tensor: Predicted vector field of shape (batch_size, *data_dims).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="diffusionlab.models.DiffusionModel.loss" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">loss</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">sample_weights</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the loss for a batch of data at specified time steps.</p>
+<p>This method:
+1. Repeats each sample N_noise_per_sample times
+2. Adds noise to the data according to the diffusion process
+3. Predicts the vector field
+4. Computes the loss between the prediction and the ground truth</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>x</code>
+            </td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Input data of shape (batch_size, *data_dims).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>t</code>
+            </td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Time steps of shape (batch_size,).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>sample_weights</code>
+            </td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Weights for each sample of shape (batch_size,).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>torch.Tensor: Scalar loss value.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="diffusionlab.models.DiffusionModel.on_validation_epoch_end" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">on_validation_epoch_end</span><span class="p">()</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Perform operations at the end of a validation epoch.</p>
+<p>This method is called by PyTorch Lightning at the end of each validation epoch.
+It computes and logs any batch-free metrics that require the entire validation set.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="diffusionlab.models.DiffusionModel.precompute_train_schedule" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">precompute_train_schedule</span><span class="p">(</span><span class="n">train_ts_hparams</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Precompute time steps and their associated weights for training.</p>
+<p>This method generates the time steps used during training and computes
+the loss weights and sampling probabilities for each time step.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>train_ts_hparams</code>
+            </td>
+            <td>
+                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="float">float</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parameters for the training time step scheduler.
+Typically includes t_min, t_max, and the number of steps L.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="diffusionlab.models.DiffusionModel.training_step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">training_step</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">batch_idx</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Perform a single training step.</p>
+<p>This method is called by PyTorch Lightning during training.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>batch</code>
+            </td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Batch of data, typically a tuple (x, metadata).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>batch_idx</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Index of the current batch.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>torch.Tensor: Loss value for the batch.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="diffusionlab.models.DiffusionModel.validation_step" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">validation_step</span><span class="p">(</span><span class="n">batch</span><span class="p">,</span> <span class="n">batch_idx</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Perform a single validation step.</p>
+<p>This method is called by PyTorch Lightning during validation.
+It computes the loss and any batch-wise metrics.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>batch</code>
+            </td>
+            <td>
+                  <code><span title="torch.Tensor">Tensor</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Batch of data, typically a tuple (x, metadata).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>batch_idx</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Index of the current batch.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="torch.Tensor">Tensor</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dict[str, torch.Tensor]: Dictionary of metric values.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.expand", "navigation.indexes", "content.code.copy"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c8b220af.min.js"></script>
+      
+    
+  </body>
+</html>
