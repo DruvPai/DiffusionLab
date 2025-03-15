@@ -36,6 +36,40 @@ When I'm writing code for experimenting with diffusion models at smaller scales 
  
 If you want to add a feature in the spirit of the above motivation, or want to make the code more efficient, feel free to make an Issue or Pull Request. I hope this project is useful in your exploration of diffusion models.
 
+## Examples
+
+## Examples
+
+### Example of Sampling 
+
+```python
+from diffusionlab.diffusions import OrnsteinUhlenbeckProcess 
+from diffusionlab.samplers import DDMSampler
+from diffusionlab.schedulers import UniformScheduler
+from diffusionlab.vector_fields import VectorField, VectorFieldType
+
+device = ...  # fix a device
+N = 10
+L = 50
+D = 20
+t_min = 0.01
+t_max = 1.0
+diffusion_process = OrnsteinUhlenbeckProcess()
+sampler = DDMSampler(diffusion_process, is_stochastic=True)  # DDPM sampler; if is_stochastic==False then it becomes DDIM sampler
+scheduler = UniformScheduler()
+eps_predictor = get_eps_predictor(diffusion_process)  # This function doesn't exist, but you can get such a predictor by training a NN with signature (N, D*) x (N, ) -> (N, D*)
+eps_vf = VectorField(eps_predictor, VectorFieldType.EPS)
+
+ts = scheduler.get_ts(t_min=t_min, t_max=t_max, L=L).to(device)
+x_init = torch.randn((N, D), device=device)
+zs = torch.randn((L-1, N, D), device=device)
+samples = sampler.sample(eps_vf, x_init, zs, ts)
+```
+
+### (Long) End-To-End Example of Training and Sampling
+
+The linked file [demo.py](https://github.com/DruvPai/DiffusionLab/blob/main/demo.py) is an end-to-end example of training and sampling from a toy diffusion model on synthetic data.
+
 ## How to Install
 
 ### Install via Pip

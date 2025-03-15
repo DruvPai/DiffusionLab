@@ -3,7 +3,7 @@
 
 ![DiffusionLab Logo](docs/diffusionlab_logo.svg)
 
-[Documentation](druvpai.github.io/diffusionlab) • `pip install diffusionlab` 
+[Documentation](https://druvpai.github.io/diffusionlab) • `pip install diffusionlab` 
 
 ![Test coverage](https://github.com/druvpai/diffusionlab/actions/workflows/precommit.yml/badge.svg)
 
