@@ -1,4 +1,4 @@
-name: PyTests
+name: Linting and Formatting
 
 on:
   push:
@@ -21,6 +21,9 @@ jobs:
         
     - name: Install the project
       run: uv sync --all-extras --dev
+
+    - name: Run Ruff linter
+      run: uv run ruff check --output-format=github .
 
     - name: Run Ruff formatter
       run: uv run ruff format .

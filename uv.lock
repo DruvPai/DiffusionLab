@@ -215,7 +215,6 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "coverage" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -229,7 +228,6 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "coverage", marker = "extra == 'dev'", specifier = ">=7.6.12" },
     { name = "lightning", specifier = ">=2.5.0.post0" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.1" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.6.8" },
