@@ -93,15 +93,19 @@ Then feel free to use it! The import is `import diffusionlab`. You can see an ex
 
 ## Roadmap/TODOs
 
-- Add Diffusers-style pipelines for common tasks (e.g., training, sampling)
-- Support latent diffusion
-- Support conditional diffusion samplers like CFG
-- Add patch-based optimal denoiser as in [Niedoba et al](https://arxiv.org/abs/2411.19339)
+<ul>
+  <li>Add Diffusers-style pipelines for common tasks (e.g., training, sampling)</li>
+  <li>Support latent diffusion</li>
+  <li>Support conditional diffusion samplers like CFG</li>
+  <li>Add patch-based optimal denoiser as in <a href="https://arxiv.org/abs/2411.19339">Niedoba et al</a></li>
+</ul>
 
 Version guide:
-- Major version update (1 -> 2, etc): initial upload or major refactor.
-- Minor version update (1.0 -> 1.1 -> 1.2, etc): breaking change or large feature integration or large update.
-- Anything smaller (1.0.0 -> 1.0.1 -> 1.0.2, etc): non-breaking change, small feature integration, better documentation, etc.
+<ul>
+  <li>Major version update (1 -> 2, etc): initial upload or major refactor.</li>
+  <li>Minor version update (1.0 -> 1.1 -> 1.2, etc): breaking change or large feature integration or large update.</li>
+  <li>Anything smaller (1.0.0 -> 1.0.1 -> 1.0.2, etc): non-breaking change, small feature integration, better documentation, etc.</li>
+</ul>
 
 ## How to Contribute
 
@@ -110,10 +114,12 @@ Just clone the repository locally using
 pip install -e ".[dev,docs]"
 ```
 make a new branch, and make a PR when you feel ready. Here are a couple quick guidelines:
-- If the function involves nontrivial dimension manipulation, please annotate each tensor with its shape in a comment beside its definition. Examples are found throughout the codebase.
-- Please add tests for all nontrivial code.
-- If you want to add a new package, update the `pyproject.toml` accordingly.
-- We use `Ruff` for formatting, Pytest for tests, and `pytest-cov` for code coverage.
+<ul>
+  <li> If the function involves nontrivial dimension manipulation, please annotate each tensor with its shape in a comment beside its definition. Examples are found throughout the codebase.
+  <li> Please add tests for all nontrivial code. Try to keep the coverage as high as possible.
+  <li> If you want to add a new package, update the `pyproject.toml` accordingly.
+  <li> We use `Ruff` for formatting, Pytest for tests, and `pytest-cov` for code coverage.
+</ul>
 
 Here "nontrivial" is left up to your judgement. A good first contribution is to add more integration tests.
 
