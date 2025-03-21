@@ -179,7 +179,7 @@ class TestDiffusionModel:
         assert result["lr_scheduler"] is lr_scheduler
 
     def test_loss(self):
-        """Test loss computation."""
+        """Test loss computation with batchwise_loss_factory."""
         # Create mock objects
         net = MagicMock(spec=nn.Module)
         diffusion_process = MagicMock(spec=DiffusionProcess)
@@ -191,9 +191,12 @@ class TestDiffusionModel:
         t = torch.ones(batch_size) * 0.5
         sample_weights = torch.ones(batch_size)
 
-        # Create a mock for SamplewiseDiffusionLoss
+        # Create a mock for SamplewiseDiffusionLoss and batchwise_loss_factory
+        mock_batchwise_loss = MagicMock()
+        mock_batchwise_loss.return_value = torch.tensor(0.35)  # Expected mean loss
+
         mock_loss = MagicMock()
-        mock_loss.return_value = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
+        mock_loss.batchwise_loss_factory.return_value = mock_batchwise_loss
 
         # Create a proper scheduler that returns a tensor
         train_scheduler = MagicMock(spec=Scheduler)
@@ -221,20 +224,17 @@ class TestDiffusionModel:
                 N_noise_draws_per_sample=2,
             )
 
-        # Manually set up the samplewise_loss attribute
-        model.samplewise_loss = mock_loss
+        # Manually set up the mock batchwise_loss function
+        model.batchwise_loss = mock_batchwise_loss
 
-        # Create a consistent noise tensor for testing
-        noise = torch.randn(batch_size * 2, data_dim)
+        # Call loss method
+        result = model.loss(x, t, sample_weights)
 
-        # Mock torch.randn_like to return our controlled noise
-        with patch("torch.randn_like", return_value=noise):
-            # Call loss method
-            result = model.loss(x, t, sample_weights)
+        # Verify the batchwise_loss was called with the right arguments
+        mock_batchwise_loss.assert_called_once_with(model, x, t, sample_weights)
 
-        # Verify the result is the mean of the loss values
-        expected_mean = torch.mean(torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]))
-        assert torch.isclose(result, expected_mean)
+        # Verify the result matches what the mock returned
+        assert torch.isclose(result, torch.tensor(0.35))
 
     def test_aggregate_loss(self):
         """Test aggregate_loss method."""
@@ -582,3 +582,48 @@ class TestDiffusionModel:
             assert kwargs["on_step"] == model.LOG_ON_STEP_BATCHFREE_METRICS
             assert kwargs["on_epoch"] == model.LOG_ON_EPOCH_BATCHFREE_METRICS
             assert kwargs["prog_bar"] == model.LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS
+
+    def test_get_metric_label(self):
+        """Test _get_metric_label method with various input combinations."""
+        # Create a minimal DiffusionModel for testing
+        with patch.object(DiffusionModel, "precompute_train_schedule"):
+            model = DiffusionModel(
+                net=MagicMock(spec=nn.Module),
+                diffusion_process=MagicMock(spec=DiffusionProcess),
+                train_scheduler=MagicMock(spec=Scheduler),
+                vector_field_type=VectorFieldType.EPS,
+                optimizer=MagicMock(spec=optim.Optimizer),
+                lr_scheduler=MagicMock(spec=optim.lr_scheduler.LRScheduler),
+                batchwise_metrics={},
+                batchfree_metrics={},
+                train_ts_hparams={"t_min": 0.001, "t_max": 0.99, "L": 10},
+                t_loss_weights=lambda t: torch.ones_like(t),
+                t_loss_probs=lambda t: torch.ones_like(t) / t.shape[0],
+                N_noise_draws_per_sample=2,
+            )
+
+        # Test case 1: Both metric_name and key are non-empty
+        result = model._get_metric_label("accuracy", "val")
+        assert result == "accuracy_val"
+
+        # Test case 2: metric_name is empty
+        result = model._get_metric_label("", "val")
+        assert result == "val"
+
+        # Test case 3: key is empty
+        result = model._get_metric_label("accuracy", "")
+        assert result == "accuracy"
+
+        # Test case 4: Both metric_name and key are empty
+        result = model._get_metric_label("", "")
+        assert result == ""
+
+        # Test case 5: Both metric_name and key contain whitespace
+        result = model._get_metric_label("  accuracy  ", "  val  ")
+        assert result == "accuracy_val"
+
+        # Test case 6: One has whitespace, one is empty
+        result = model._get_metric_label("  accuracy  ", "")
+        assert result == "accuracy"
+        result = model._get_metric_label("", "  val  ")
+        assert result == "val"

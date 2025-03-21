@@ -33,8 +33,9 @@ class DiffusionModel(LightningModule, VectorField):
         batchfree_metrics (nn.ModuleDict): Metrics computed at the end of validation epoch.
         t_loss_weights (Callable): Function that weights loss at different time steps.
         t_loss_probs (Callable): Function that determines sampling probability of time steps.
-        N_noise_per_sample (int): Number of noise samples per data point.
+        N_noise_draws_per_sample (int): Number of noise samples per data point.
         samplewise_loss (SamplewiseDiffusionLoss): Loss function for each sample.
+        batchwise_loss (Callable): Factory-generated function that computes loss for a batch.
         train_ts (torch.Tensor): Precomputed time steps for training.
         train_ts_loss_weights (torch.Tensor): Precomputed weights for each time step.
         train_ts_loss_probs (torch.Tensor): Precomputed sampling probabilities for each time step.
@@ -94,6 +95,9 @@ class DiffusionModel(LightningModule, VectorField):
             N_noise_draws_per_sample (int): Number of noise draws per data point.
         """
         super().__init__()
+        # Initialize VectorField with a forward function for the current instance
+        VectorField.__init__(self, self.forward, vector_field_type)
+
         self.net: nn.Module = net
         self.vector_field_type: VectorFieldType = vector_field_type
         self.diffusion_process: DiffusionProcess = diffusion_process
@@ -107,8 +111,14 @@ class DiffusionModel(LightningModule, VectorField):
         self.t_loss_probs: Callable[[torch.Tensor], torch.Tensor] = t_loss_probs
         self.N_noise_draws_per_sample: int = N_noise_draws_per_sample
 
+        # Create the samplewise loss function
         self.samplewise_loss: SamplewiseDiffusionLoss = SamplewiseDiffusionLoss(
             diffusion_process, vector_field_type
+        )
+
+        # Create the batchwise loss function using the factory method
+        self.batchwise_loss = self.samplewise_loss.batchwise_loss_factory(
+            N_noise_draws_per_sample=N_noise_draws_per_sample
         )
 
         self.register_buffer("train_ts", torch.zeros((0,)))
@@ -165,11 +175,8 @@ class DiffusionModel(LightningModule, VectorField):
         """
         Compute the loss for a batch of data at specified time steps.
 
-        This method:
-        1. Repeats each sample N_noise_per_sample times
-        2. Adds noise to the data according to the diffusion process
-        3. Predicts the vector field
-        4. Computes the loss between the prediction and the ground truth
+        Uses the batchwise_loss function created from the SamplewiseDiffusionLoss factory
+        to compute the loss for the batch.
 
         Args:
             x (torch.Tensor): Input data of shape (batch_size, *data_dims).
@@ -179,19 +186,7 @@ class DiffusionModel(LightningModule, VectorField):
         Returns:
             torch.Tensor: Scalar loss value.
         """
-        x = torch.repeat_interleave(x, self.N_noise_draws_per_sample, dim=0)
-        t = torch.repeat_interleave(t, self.N_noise_draws_per_sample, dim=0)
-        sample_weights = torch.repeat_interleave(
-            sample_weights, self.N_noise_draws_per_sample, dim=0
-        )
-
-        eps = torch.randn_like(x)
-        xt = self.diffusion_process.forward(x, t, eps)
-        fxt = self(xt, t)
-
-        samplewise_loss = self.samplewise_loss(xt, fxt, x, eps, t)
-        mean_loss = torch.mean(samplewise_loss * sample_weights)
-        return mean_loss
+        return self.batchwise_loss(self, x, t, sample_weights)
 
     def aggregate_loss(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -261,7 +256,8 @@ class DiffusionModel(LightningModule, VectorField):
         for metric_name, metric in self.batchwise_metrics.items():
             metric_values_dict = metric(x, metadata, self)
             for key, value in metric_values_dict.items():
-                metric_values[f"{metric_name}_{key}"] = value
+                metric_label = self._get_metric_label(metric_name, key)
+                metric_values[metric_label] = value
         self.log_dict(
             metric_values,
             on_step=self.LOG_ON_STEP_BATCHWISE_METRICS,
@@ -281,10 +277,32 @@ class DiffusionModel(LightningModule, VectorField):
         for metric_name, metric in self.batchfree_metrics.items():
             metric_values_dict = metric(self)
             for key, value in metric_values_dict.items():
-                metric_values[f"{metric_name}_{key}"] = value
+                metric_label = self._get_metric_label(metric_name, key)
+                metric_values[metric_label] = value
         self.log_dict(
             metric_values,
             on_step=self.LOG_ON_STEP_BATCHFREE_METRICS,
             on_epoch=self.LOG_ON_EPOCH_BATCHFREE_METRICS,
             prog_bar=self.LOG_ON_PROGRESS_BAR_BATCHFREE_METRICS,
         )
+
+    def _get_metric_label(self, metric_name: str, key: str) -> str:
+        """
+        Get the label for a metric's values.
+
+        This method concatenates the metric name and key with an underscore if both are non-empty.
+        If one of the two is empty, it concatenates the non-empty one with the other.
+
+        Args:
+            metric_name (str): The name of the metric.
+            key (str): The key of the metric.
+
+        Returns:
+            str: The label for the metric's values.
+        """
+        metric_name, key = metric_name.strip(), key.strip()
+        if len(metric_name) > 0 and len(key) > 0:
+            metric_label = f"{metric_name}_{key}"
+        else:
+            metric_label = f"{metric_name}{key}"
+        return metric_label

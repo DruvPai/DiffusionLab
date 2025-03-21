@@ -5,7 +5,7 @@ from torch import nn
 
 from diffusionlab.diffusions import DiffusionProcess
 from diffusionlab.utils import pad_shape_back
-from diffusionlab.vector_fields import VectorFieldType
+from diffusionlab.vector_fields import VectorField, VectorFieldType
 
 
 class SamplewiseDiffusionLoss(nn.Module):
@@ -169,3 +169,73 @@ class SamplewiseDiffusionLoss(nn.Module):
         )
 
         return samplewise_loss
+
+    def batchwise_loss_factory(
+        self, N_noise_draws_per_sample: int
+    ) -> Callable[
+        [VectorField, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor
+    ]:
+        """
+        Create a batchwise loss function that averages the samplewise loss over multiple noise draws per sample.
+
+        This factory method returns a function that can be used during training to compute the loss
+        for a batch of data. The returned function handles the process of:
+        1. Repeating each sample N times to apply different noise realizations
+        2. Adding noise according to the diffusion process
+        3. Computing model predictions
+        4. Calculating and weighting the loss
+
+        Args:
+            N_noise_draws_per_sample (int): The number of different noise realizations to use
+                for each data sample. Higher values can reduce variance but increase computation.
+
+        Returns:
+            Callable[[VectorField, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
+                A function that computes the weighted average loss across a batch with the signature:
+                (vector_field, data, timesteps, sample_weights) -> scalar_loss
+        """
+
+        def batchwise_loss(
+            f: VectorField,
+            x: torch.Tensor,
+            t: torch.Tensor,
+            sample_weights: torch.Tensor,
+        ) -> torch.Tensor:
+            """
+            Compute the weighted average loss across a batch with multiple noise draws per sample.
+
+            This function:
+            1. Verifies the vector field type matches the target type
+            2. Repeats each sample N_noise_draws_per_sample times to apply different noise realizations
+            3. Adds noise to the data according to the diffusion process at time t
+            4. Computes the model's predictions
+            5. Calculates the per-sample loss and applies sample weights
+            6. Returns the mean loss across all samples and noise draws
+
+            Args:
+                f (VectorField): The vector field model to evaluate, must match the target type
+                    of this loss function.
+                x (torch.Tensor): The clean input data, of shape (N, *D).
+                t (torch.Tensor): The diffusion timesteps, of shape (N,).
+                sample_weights (torch.Tensor): The importance weights for each sample in the batch,
+                    of shape (N,). Used to prioritize certain samples in the loss.
+
+            Returns:
+                torch.Tensor: A scalar tensor containing the weighted average loss.
+            """
+            assert f.vector_field_type == self.target_type
+            x = torch.repeat_interleave(x, N_noise_draws_per_sample, dim=0)
+            t = torch.repeat_interleave(t, N_noise_draws_per_sample, dim=0)
+            sample_weights = torch.repeat_interleave(
+                sample_weights, N_noise_draws_per_sample, dim=0
+            )
+
+            eps = torch.randn_like(x)
+            xt = self.diffusion_process.forward(x, t, eps)
+            fxt = f(xt, t)
+
+            samplewise_loss = self(xt, fxt, x, eps, t)
+            mean_loss = torch.mean(samplewise_loss * sample_weights)
+            return mean_loss
+
+        return batchwise_loss
