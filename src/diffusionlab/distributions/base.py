@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Callable
 
 import torch
 
@@ -33,6 +33,43 @@ class Distribution:
             AssertionError: If the parameters are invalid, the assertion fails at exactly the point of failure.
         """
         assert len(dist_hparams) == 0
+
+    @classmethod
+    def get_vector_field_method(
+        cls, vector_field_type: VectorFieldType
+    ) -> Callable[
+        [
+            torch.Tensor,
+            torch.Tensor,
+            DiffusionProcess,
+            Dict[str, torch.Tensor],
+            Dict[str, Any],
+        ],
+        torch.Tensor,
+    ]:
+        """
+        Returns the appropriate method to compute the specified vector field type.
+
+        Arguments:
+            vector_field_type: The type of vector field to compute.
+
+        Returns:
+            A method that computes the specified vector field, with signature:
+            (x_t, t, diffusion_process, batched_dist_params, dist_hparams) -> tensor
+
+        Raises:
+            ValueError: If the vector field type is not recognized.
+        """
+        if vector_field_type == VectorFieldType.X0:
+            return cls.x0
+        elif vector_field_type == VectorFieldType.EPS:
+            return cls.eps
+        elif vector_field_type == VectorFieldType.V:
+            return cls.v
+        elif vector_field_type == VectorFieldType.SCORE:
+            return cls.score
+        else:
+            raise ValueError(f"Unrecognized vector field type: {vector_field_type}")
 
     @classmethod
     def validate_params(
