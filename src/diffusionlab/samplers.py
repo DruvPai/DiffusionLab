@@ -1,829 +1,589 @@
 from typing import Callable, Tuple
 
-import torch
+from dataclasses import dataclass, field
+import jax
+from jax import Array, numpy as jnp
 
-from diffusionlab.diffusions import DiffusionProcess
-from diffusionlab.utils import pad_shape_back
+from diffusionlab.dynamics import DiffusionProcess
 from diffusionlab.vector_fields import (
-    VectorField,
     VectorFieldType,
     convert_vector_field_type,
 )
 
 
+@dataclass
 class Sampler:
     """
-    Class for sampling from diffusion models using various vector field types.
+    Base class for sampling from diffusion models using various vector field types.
 
-    A Sampler combines a diffusion process and a scheduler to generate samples from
-    a trained diffusion model. It handles both the forward process (adding noise) and
-    the reverse process (denoising/sampling).
+    A Sampler combines a diffusion process, a vector field prediction function, and a scheduler
+    to generate samples from a trained diffusion model using the reverse process (denoising/sampling).
 
     The sampler supports different vector field types (SCORE, X0, EPS, V) and can perform
-    both stochastic and deterministic sampling.
+    both stochastic and deterministic sampling based on the subclass implementation and the
+    `use_stochastic_sampler` flag.
 
     Attributes:
-        diffusion_process (DiffusionProcess): The diffusion process defining the forward and reverse dynamics
-        is_stochastic (bool): Whether the reverse process is stochastic or deterministic
+        diffusion_process (DiffusionProcess): The diffusion process defining the forward dynamics.
+        vector_field (Callable[[Array[*data_dims], Array[]], Array[*data_dims]]): The function predicting the vector field.
+            Takes the current state `x` and time `t` as input.
+        vector_field_type (VectorFieldType): The type of the vector field predicted by `vector_field`.
+        use_stochastic_sampler (bool): Whether to use a stochastic or deterministic reverse process.
+        sample_step (Callable[[int, Array, Array, Array], Array]): The specific function used to perform one sampling step.
+            Takes step index `idx`, current state `x`, noise array `zs`, and time schedule `ts` as input.
+            Set during initialization based on the sampler type and `use_stochastic_sampler`.
     """
 
-    def __init__(
-        self,
-        diffusion_process: DiffusionProcess,
-        is_stochastic: bool,
-    ):
-        """
-        Initialize a sampler with a diffusion process and sampling strategy.
+    diffusion_process: DiffusionProcess
+    vector_field: Callable[[Array, Array], Array]
+    vector_field_type: VectorFieldType
+    use_stochastic_sampler: bool
+    sample_step: Callable[[int, Array, Array, Array], Array] = field(init=False)
 
-        Args:
-            diffusion_process (DiffusionProcess): The diffusion process to use for sampling
-            is_stochastic (bool): Whether the reverse process should be stochastic
-        """
-        self.diffusion_process: DiffusionProcess = diffusion_process
-        self.is_stochastic: bool = is_stochastic
+    def __post_init__(self):
+        self.sample_step = self.get_sample_step_function()
 
-    def sample(
-        self,
-        vector_field: VectorField,
-        x_init: torch.Tensor,
-        zs: torch.Tensor,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
+    def sample(self, x_init: Array, zs: Array, ts: Array) -> Array:
         """
         Sample from the model using the reverse diffusion process.
 
-        This method generates a sample by iteratively applying the appropriate sampling step
-        function based on the vector field type.
+        This method generates a final sample by iteratively applying the `sample_step` function,
+        starting from an initial state `x_init` and using the provided noise `zs` and time schedule `ts`.
 
         Args:
-            vector_field (VectorField): The vector field model to use for sampling
-            x_init (torch.Tensor): The initial noisy tensor to start sampling from, of shape (N, *D) where N is the batch size and D represents the data dimensions
-            zs (torch.Tensor): The noise tensors for stochastic sampling, of shape (L-1, N, *D)
-                where L is the number of time steps
-            ts (torch.Tensor): The time schedule for sampling, of shape (L,)
-                where L is the number of time steps
+            x_init (Array[*data_dims]): The initial noisy tensor from which to initialize sampling (typically sampled from the prior distribution at ts[0]).
+            zs (Array[num_steps, *data_dims]): The noise tensors used at each step for stochastic sampling. Unused for deterministic samplers.
+            ts (Array[num_steps+1]): The time schedule for sampling. A sorted decreasing array of times from t_max to t_min.
 
         Returns:
-            torch.Tensor: The generated sample, of shape (N, *D)
+            Array[*data_dims]: The generated sample at the final time ts[-1].
         """
-        sample_step_function = self.get_sample_step_function(
-            vector_field.vector_field_type
-        )
-        x = x_init
-        for i in range(ts.shape[0] - 1):
-            x = sample_step_function(vector_field, x, zs, i, ts)
-        return x
 
-    def sample_trajectory(
-        self,
-        vector_field: VectorField,
-        x_init: torch.Tensor,
-        zs: torch.Tensor,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
+        def scan_fn(x, idx):
+            next_x = self.sample_step(idx, x, zs, ts)
+            return next_x, None
+
+        final_x, _ = jax.lax.scan(scan_fn, x_init, jnp.arange(zs.shape[0]))
+
+        return final_x
+
+    def sample_trajectory(self, x_init: Array, zs: Array, ts: Array) -> Array:
         """
         Sample a trajectory from the model using the reverse diffusion process.
 
-        This method is similar to sample() but returns the entire trajectory of
-        intermediate samples rather than just the final sample.
+        This method generates the entire trajectory of intermediate samples by iteratively
+        applying the `sample_step` function.
 
         Args:
-            vector_field (VectorField): The vector field model to use for sampling
-            x_init (torch.Tensor): The initial noisy tensor to start sampling from, of shape (N, *D)
-                where N is the batch size and D represents the data dimensions
-            zs (torch.Tensor): The noise tensors for stochastic sampling, of shape (L-1, N, *D)
-                where L is the number of time steps
-            ts (torch.Tensor): The time schedule for sampling, of shape (L,)
-                where L is the number of time steps
+            x_init (Array[*data_dims]): The initial noisy tensor from which to start sampling (at time ts[0]).
+            zs (Array[num_steps, *data_dims]): The noise tensors used at each step for stochastic sampling. Unused for deterministic samplers.
+            ts (Array[num_steps+1]): The time schedule for sampling. A sorted decreasing array of times from t_max to t_min.
 
         Returns:
-            torch.Tensor: The generated trajectory, of shape (L, N, *D)
-                where L is the number of time steps
+            Array[num_steps+1, *data_dims]: The complete generated trajectory including the initial state `x_init`.
         """
-        sample_step_function = self.get_sample_step_function(
-            vector_field.vector_field_type
-        )
-        xs = [x_init]
-        x = x_init
-        for i in range(ts.shape[0] - 1):
-            x = sample_step_function(vector_field, x, zs, i, ts)
-            xs.append(x)
-        return torch.stack(xs)
 
-    def get_sample_step_function(
-        self, vector_field_type: VectorFieldType
-    ) -> Callable[
-        [VectorField, torch.Tensor, torch.Tensor, int, torch.Tensor], torch.Tensor
-    ]:
+        def scan_fn(x, idx):
+            next_x = self.sample_step(idx, x, zs, ts)
+            return next_x, next_x
+
+        _, xs = jax.lax.scan(scan_fn, x_init, jnp.arange(zs.shape[0]))
+
+        xs = jnp.concatenate([x_init[None, ...], xs], axis=0)
+        return xs
+
+    def get_sample_step_function(self) -> Callable[[int, Array, Array, Array], Array]:
         """
-        Get the appropriate sampling step function based on the vector field type.
+        Abstract method to get the appropriate sampling step function.
 
-        This method selects the correct sampling function based on the vector field type
-        and whether sampling is stochastic or deterministic.
-
-        Args:
-            vector_field_type (VectorFieldType): The type of vector field being used
-                                                (SCORE, X0, EPS, or V)
+        Subclasses must implement this method to return the specific function used
+        for performing one step of the reverse process, based on the sampler's
+        implementation details (e.g., integrator type) and the `use_stochastic_sampler` flag.
 
         Returns:
-            Callable: A function that performs one step of the sampling process with signature:
-                     (vector_field, x, zs, idx, ts) -> next_x
-                     where:
-                     - vector_field is the model
-                     - x is the current state tensor of shape (N, *D)
-                       where N is the batch size and D represents the data dimensions
-                     - zs is the noise tensors of shape (L-1, N, *D)
-                       where L is the number of time steps
-                     - idx is the current step index
-                     - ts is the time steps tensor of shape (L,)
-                       where L is the number of time steps
-                     - next_x is the next state tensor of shape (N, *D)
-        """
-        f = None
-        if self.is_stochastic:
-            if vector_field_type == VectorFieldType.SCORE:
-                f = self.sample_step_stochastic_score
-            elif vector_field_type == VectorFieldType.X0:
-                f = self.sample_step_stochastic_x0
-            elif vector_field_type == VectorFieldType.EPS:
-                f = self.sample_step_stochastic_eps
-            elif vector_field_type == VectorFieldType.V:
-                f = self.sample_step_stochastic_v
-        else:
-            if vector_field_type == VectorFieldType.SCORE:
-                f = self.sample_step_deterministic_score
-            elif vector_field_type == VectorFieldType.X0:
-                f = self.sample_step_deterministic_x0
-            elif vector_field_type == VectorFieldType.EPS:
-                f = self.sample_step_deterministic_eps
-            elif vector_field_type == VectorFieldType.V:
-                f = self.sample_step_deterministic_v
-        return f
-
-    def _fix_t_shape(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
-        """
-        Reshape the time tensor to be compatible with the batch dimension of x.
-
-        Args:
-            x (torch.Tensor): The data tensor of shape (N, *D)
-                where N is the batch size and D represents the data dimensions
-            t (torch.Tensor): The time tensor to reshape, of shape (1, 1, ..., 1)
-                or any shape that can be broadcast to match the batch size
-
-        Returns:
-            torch.Tensor: The reshaped time tensor of shape (N,)
-                where N is the batch size of x
-        """
-        t = t.view((1,)).expand(x.shape[0])
-        return t
-
-    def sample_step_stochastic_score(
-        self,
-        score: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform a stochastic sampling step using the score vector field.
-
-        This method implements one step of the stochastic reverse process using the score function.
-
-        Args:
-            score (VectorField): The score vector field model
-            x (torch.Tensor): The current state tensor, of shape (N, *D)
-                where N is the batch size and D represents the data dimensions
-            zs (torch.Tensor): The noise tensors for stochastic sampling, of shape (L-1, N, *D)
-                where L is the number of time steps
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-                where L is the number of time steps
-
-        Returns:
-            torch.Tensor: The next state tensor, of shape (N, *D)
-        """
-        raise NotImplementedError
-
-    def sample_step_deterministic_score(
-        self,
-        score: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of deterministic sampling using the score vector field.
-
-        Args:
-            score (VectorField): The score vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        raise NotImplementedError
-
-    def sample_step_stochastic_x0(
-        self,
-        x0: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of stochastic sampling using the x0 vector field.
-
-        Args:
-            x0 (VectorField): The x0 vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        raise NotImplementedError
-
-    def sample_step_deterministic_x0(
-        self,
-        x0: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of deterministic sampling using the x0 vector field.
-
-        Args:
-            x0 (VectorField): The x0 vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        raise NotImplementedError
-
-    def sample_step_stochastic_eps(
-        self,
-        eps: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of stochastic sampling using the eps vector field.
-
-        Args:
-            eps (VectorField): The eps vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        raise NotImplementedError
-
-    def sample_step_deterministic_eps(
-        self,
-        eps: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of deterministic sampling using the eps vector field.
-
-        Args:
-            eps (VectorField): The eps vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        raise NotImplementedError
-
-    def sample_step_stochastic_v(
-        self,
-        v: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of stochastic sampling using the v vector field.
-
-        Args:
-            v (VectorField): The velocity vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
-        """
-        raise NotImplementedError
-
-    def sample_step_deterministic_v(
-        self,
-        v: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform one step of deterministic sampling using the v vector field.
-
-        Args:
-            v (VectorField): The velocity vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-
-        Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+            Callable[[int, Array, Array, Array], Array]: The sampling step function.
+                Input signature: (idx: int, x: Array[*data_dims], zs: Array[num_steps, *data_dims], ts: Array[num_steps+1])
+                Output: Array[*data_dims] (the state at the next timestep)
         """
         raise NotImplementedError
 
 
 class EulerMaruyamaSampler(Sampler):
-    def _get_step_quantities(
-        self, zs: torch.Tensor, idx: int, ts: torch.Tensor
-    ) -> Tuple[
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-    ]:
+    """
+    Class for sampling from diffusion models using the first-order Euler-Maruyama integrator
+    for the reverse process SDE/ODE.
+
+    This sampler implements the step function based on the Euler-Maruyama discretization
+    of the reverse SDE (if `use_stochastic_sampler` is True) or the corresponding
+    probability flow ODE (if `use_stochastic_sampler` is False). It supports all
+    vector field types (SCORE, X0, EPS, V).
+
+
+    Attributes:
+        diffusion_process (DiffusionProcess): The diffusion process defining the forward dynamics.
+        vector_field (Callable[[Array[*data_dims], Array[]], Array[*data_dims]]): The function predicting the vector field.
+            Takes the current state `x` and time `t` as input.
+        vector_field_type (VectorFieldType): The type of the vector field predicted by `vector_field`.
+        use_stochastic_sampler (bool): Whether to use a stochastic or deterministic reverse process.
+        sample_step (Callable[[int, Array, Array, Array], Array]): The specific function used to perform one sampling step.
+            Takes step index `idx`, current state `x`, noise array `zs`, and time schedule `ts` as input.
+            Set during initialization based on the sampler type and `use_stochastic_sampler`.
+    """
+
+    def get_sample_step_function(self) -> Callable[[int, Array, Array, Array], Array]:
         """
-        Calculate various quantities needed for a sampling step.
-
-        This helper method computes time-dependent quantities used in the sampling
-        step functions.
-
-        Args:
-            zs (torch.Tensor): The noise tensors for stochastic sampling, of shape (L-1, N, *D)
-                where L is the number of time steps, N is the batch size, and D represents the data dimensions
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-                where L is the number of time steps
+        Get the appropriate Euler-Maruyama sampling step function based on the
+        vector field type and stochasticity.
 
         Returns:
-            Tuple: A tuple containing various time-dependent quantities:
-                  - t (torch.Tensor): Current time, of shape (1*), where 1* is a tuple with the same number of dimensions as (N, D*)
-                  - t1 (torch.Tensor): Next time, of shape (1*)
-                  - alpha_t (torch.Tensor): Alpha at current time, of shape (1*)
-                  - sigma_t (torch.Tensor): Sigma at current time, of shape (1*)
-                  - alpha_prime_t (torch.Tensor): Derivative of alpha at current time, of shape (1*)
-                  - sigma_prime_t (torch.Tensor): Derivative of sigma at current time, of shape (1*)
-                  - dt (torch.Tensor): Time difference, of shape (1*)
-                  - dwt (torch.Tensor): Scaled noise, of shape (N, *D)
-                  - alpha_ratio_t (torch.Tensor): alpha_prime_t / alpha_t, of shape (1*)
-                  - sigma_ratio_t (torch.Tensor): sigma_prime_t / sigma_t, of shape (1*)
-                  - diff_ratio_t (torch.Tensor): sigma_ratio_t - alpha_ratio_t, of shape (1*)
+            Callable[[int, Array, Array, Array], Array]: The specific Euler-Maruyama step function to use.
+                Input signature: (idx: int, x: Array[*data_dims], zs: Array[num_steps, *data_dims], ts: Array[num_steps+1])
+                Output: Array[*data_dims] (the state at the next timestep)
         """
-        x_shape = zs.shape[1:]
-        t = pad_shape_back(ts[idx], x_shape)
-        t1 = pad_shape_back(ts[idx + 1], x_shape)
-        dt = t1 - t
-        dwt = zs[idx] * torch.sqrt(-dt)
+        match (self.vector_field_type, self.use_stochastic_sampler):
+            case (VectorFieldType.SCORE, False):
+                return self._sample_step_score_deterministic
+            case (VectorFieldType.SCORE, True):
+                return self._sample_step_score_stochastic
+            case (VectorFieldType.X0, False):
+                return self._sample_step_x0_deterministic
+            case (VectorFieldType.X0, True):
+                return self._sample_step_x0_stochastic
+            case (VectorFieldType.EPS, False):
+                return self._sample_step_eps_deterministic
+            case (VectorFieldType.EPS, True):
+                return self._sample_step_eps_stochastic
+            case (VectorFieldType.V, False):
+                return self._sample_step_v_deterministic
+            case (VectorFieldType.V, True):
+                return self._sample_step_v_stochastic
+            case _:
+                raise ValueError(
+                    f"Unsupported vector field type: {self.vector_field_type} and stochasticity: {self.use_stochastic_sampler}"
+                )
 
-        alpha_t = pad_shape_back(self.diffusion_process.alpha(ts[idx]), x_shape)
-        sigma_t = pad_shape_back(self.diffusion_process.sigma(ts[idx]), x_shape)
-        alpha_prime_t = pad_shape_back(
-            self.diffusion_process.alpha_prime(ts[idx]), x_shape
-        )
-        sigma_prime_t = pad_shape_back(
-            self.diffusion_process.sigma_prime(ts[idx]), x_shape
-        )
+    def _get_step_quantities(
+        self,
+        idx: int,
+        zs: Array,  # Shape: [num_steps, *data_dims]
+        ts: Array,  # Shape: [num_steps+1]
+    ) -> Tuple[
+        Array, Array, Array, Array, Array, Array, Array, Array, Array, Array, Array
+    ]:
+        """
+        Calculate common quantities used in Euler-Maruyama sampling steps based on the diffusion process.
+
+        Args:
+            idx (int): Current step index (corresponds to time ts[idx]).
+            zs (Array[num_steps, *data_dims]): Noise tensors for stochastic sampling. Only zs[idx] is used if needed.
+            ts (Array[num_steps+1]): Time schedule for sampling. Used to get ts[idx] and ts[idx+1].
+
+        Returns:
+            tuple[Array[], Array[], Array[], Array[*data_dims], Array[], Array[], Array[], Array[], Array[], Array[], Array[]]:
+                A tuple containing:
+                t (Array[]): Current time ts[idx].
+                t1 (Array[]): Next time ts[idx+1].
+                dt (Array[]): Time difference (t1 - t), should be negative.
+                dwt (Array[*data_dims]): Scaled noise increment sqrt(-dt) * zs[idx] for the stochastic step.
+                alpha_t (Array[]): Alpha at current time t.
+                sigma_t (Array[]): Sigma at current time t.
+                alpha_prime_t (Array[]): Derivative of alpha at current time t.
+                sigma_prime_t (Array[]): Derivative of sigma at current time t.
+                alpha_ratio_t (Array[]): alpha_prime_t / alpha_t.
+                sigma_ratio_t (Array[]): sigma_prime_t / sigma_t.
+                diff_ratio_t (Array[]): sigma_ratio_t - alpha_ratio_t.
+        """
+        t = ts[idx]
+        t1 = ts[idx + 1]
+        dt = t1 - t
+        dw_t = zs[idx] * jnp.sqrt(-dt)  # dt is negative
+
+        alpha_t = self.diffusion_process.alpha(t)
+        sigma_t = self.diffusion_process.sigma(t)
+        alpha_prime_t = self.diffusion_process.alpha_prime(t)
+        sigma_prime_t = self.diffusion_process.sigma_prime(t)
         alpha_ratio_t = alpha_prime_t / alpha_t
         sigma_ratio_t = sigma_prime_t / sigma_t
         diff_ratio_t = sigma_ratio_t - alpha_ratio_t
+
         return (
             t,
             t1,
+            dt,
+            dw_t,
             alpha_t,
             sigma_t,
             alpha_prime_t,
             sigma_prime_t,
-            dt,
-            dwt,
             alpha_ratio_t,
             sigma_ratio_t,
             diff_ratio_t,
         )
 
-    def sample_step_deterministic_score(
-        self,
-        score: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
+    def _sample_step_score_deterministic(
+        self, idx: int, x: Array, zs: Array, ts: Array
+    ) -> Array:
         """
-        Perform one step of deterministic sampling using the score vector field.
+        Perform one deterministic Euler step using the SCORE vector field.
+        Corresponds to the probability flow ODE associated with the SCORE SDE.
 
         Args:
-            score (VectorField): The score vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
+            idx (int): Current step index.
+            x (Array[*data_dims]): Current state tensor at time ts[idx].
+            zs (Array[num_steps, *data_dims]): Noise tensors (unused).
+            ts (Array[num_steps+1]): Time schedule.
 
         Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+            Array[*data_dims]: Next state tensor at time ts[idx+1].
         """
         (
             t,
             t1,
+            dt,
+            dw_t,
             alpha_t,
             sigma_t,
             alpha_prime_t,
             sigma_prime_t,
-            dt,
-            dwt,
             alpha_ratio_t,
             sigma_ratio_t,
             diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = alpha_ratio_t * x - (sigma_t**2) * diff_ratio_t * score(
-            x, self._fix_t_shape(x, t)
-        )
-        return x + drift_t * dt
-
-    def sample_step_stochastic_score(
-        self,
-        score: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        """
-        Perform a stochastic sampling step using the score vector field.
-
-        This implements the stochastic reverse SDE for score-based models using the
-        Euler-Maruyama discretization method.
-
-        Args:
-            score (VectorField): The score vector field model
-            x (torch.Tensor): The current state tensor, of shape (N, *D)
-                where N is the batch size and D represents the data dimensions
-            zs (torch.Tensor): The noise tensors for stochastic sampling, of shape (L-1, N, *D)
-                where L is the number of time steps
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
-                where L is the number of time steps
-
-        Returns:
-            torch.Tensor: The next state tensor, of shape (N, *D)
-        """
-        (
-            t,
-            t1,
-            alpha_t,
-            sigma_t,
-            alpha_prime_t,
-            sigma_prime_t,
-            dt,
-            dwt,
-            alpha_ratio_t,
-            sigma_ratio_t,
-            diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-
-        # Compute score at current state
-        score_x_t = score(x, ts[idx])
-
-        # Compute drift and diffusion terms
-        drift = alpha_prime_t * x / alpha_t - sigma_t * sigma_prime_t * score_x_t
-        diffusion = sigma_prime_t * dwt
-
-        # Update state using Euler-Maruyama method
-        x_next = x + drift * dt + diffusion
-
+        ) = self._get_step_quantities(idx, zs, ts)
+        score_x_t = self.vector_field(x, t)
+        drift_t = alpha_ratio_t * x - (sigma_t**2) * diff_ratio_t * score_x_t
+        x_next = x + drift_t * dt
         return x_next
 
-    def sample_step_deterministic_x0(
-        self,
-        x0: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
+    def _sample_step_score_stochastic(
+        self, idx: int, x: Array, zs: Array, ts: Array
+    ) -> Array:
         """
-        Perform one step of deterministic sampling using the x0 vector field.
+        Perform one stochastic Euler-Maruyama step using the SCORE vector field.
+        Corresponds to discretizing the reverse SDE derived using the SCORE field.
 
         Args:
-            x0 (VectorField): The x0 vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
+            idx (int): Current step index.
+            x (Array[*data_dims]): Current state tensor at time ts[idx].
+            zs (Array[num_steps, *data_dims]): Noise tensors. Uses zs[idx].
+            ts (Array[num_steps+1]): Time schedule.
 
         Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+            Array[*data_dims]: Next state tensor at time ts[idx+1].
         """
         (
             t,
             t1,
+            dt,
+            dw_t,
             alpha_t,
             sigma_t,
             alpha_prime_t,
             sigma_prime_t,
-            dt,
-            dwt,
             alpha_ratio_t,
             sigma_ratio_t,
             diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = sigma_ratio_t * x - alpha_t * diff_ratio_t * x0(
-            x, self._fix_t_shape(x, t)
-        )
-        return x + drift_t * dt
+        ) = self._get_step_quantities(idx, zs, ts)
+        score_x_t = self.vector_field(x, t)
+        drift_t = alpha_ratio_t * x - 2 * (sigma_t**2) * diff_ratio_t * score_x_t
+        diffusion_t = jnp.sqrt(2 * diff_ratio_t) * sigma_t
+        x_next = x + drift_t * dt + diffusion_t * dw_t
+        return x_next
 
-    def sample_step_stochastic_x0(
-        self,
-        x0: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
+    def _sample_step_x0_deterministic(
+        self, idx: int, x: Array, zs: Array, ts: Array
+    ) -> Array:
         """
-        Perform one step of stochastic sampling using the x0 vector field.
+        Perform one deterministic Euler step using the X0 vector field.
+        Corresponds to the probability flow ODE associated with the X0 SDE.
 
         Args:
-            x0 (VectorField): The x0 vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
+            idx (int): Current step index.
+            x (Array[*data_dims]): Current state tensor at time ts[idx].
+            zs (Array[num_steps, *data_dims]): Noise tensors (unused).
+            ts (Array[num_steps+1]): Time schedule.
 
         Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+            Array[*data_dims]: Next state tensor at time ts[idx+1].
         """
         (
             t,
             t1,
+            dt,
+            dw_t,
             alpha_t,
             sigma_t,
             alpha_prime_t,
             sigma_prime_t,
-            dt,
-            dwt,
             alpha_ratio_t,
             sigma_ratio_t,
             diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
+        ) = self._get_step_quantities(idx, zs, ts)
+        x0_x_t = self.vector_field(x, t)
+        drift_t = sigma_ratio_t * x - alpha_t * diff_ratio_t * x0_x_t
+        x_next = x + drift_t * dt
+        return x_next
+
+    def _sample_step_x0_stochastic(
+        self, idx: int, x: Array, zs: Array, ts: Array
+    ) -> Array:
+        """
+        Perform one stochastic Euler-Maruyama step using the X0 vector field.
+        Corresponds to discretizing the reverse SDE derived using the X0 field.
+
+        Args:
+            idx (int): Current step index.
+            x (Array[*data_dims]): Current state tensor at time ts[idx].
+            zs (Array[num_steps, *data_dims]): Noise tensors. Uses zs[idx].
+            ts (Array[num_steps+1]): Time schedule.
+
+        Returns:
+            Array[*data_dims]: Next state tensor at time ts[idx+1].
+        """
+        (
+            t,
+            t1,
+            dt,
+            dw_t,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = self._get_step_quantities(idx, zs, ts)
+        x0_x_t = self.vector_field(x, t)
         drift_t = (
             alpha_ratio_t + 2 * diff_ratio_t
-        ) * x - 2 * alpha_t * diff_ratio_t * x0(x, self._fix_t_shape(x, t))
-        diffusion_t = torch.sqrt(2 * diff_ratio_t) * sigma_t
-        return x + drift_t * dt + diffusion_t * dwt
+        ) * x - 2 * alpha_t * diff_ratio_t * x0_x_t
+        diffusion_t = jnp.sqrt(2 * diff_ratio_t) * sigma_t
+        x_next = x + drift_t * dt + diffusion_t * dw_t
+        return x_next
 
-    def sample_step_deterministic_eps(
-        self,
-        eps: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
+    def _sample_step_eps_deterministic(
+        self, idx: int, x: Array, zs: Array, ts: Array
+    ) -> Array:
         """
-        Perform one step of deterministic sampling using the eps vector field.
+        Perform one deterministic Euler step using the EPS (epsilon/noise) vector field.
+        Corresponds to the probability flow ODE associated with the EPS SDE.
 
         Args:
-            eps (VectorField): The eps vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
+            idx (int): Current step index.
+            x (Array[*data_dims]): Current state tensor at time ts[idx].
+            zs (Array[num_steps, *data_dims]): Noise tensors (unused).
+            ts (Array[num_steps+1]): Time schedule.
 
         Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+            Array[*data_dims]: Next state tensor at time ts[idx+1].
         """
         (
             t,
             t1,
+            dt,
+            dw_t,
             alpha_t,
             sigma_t,
             alpha_prime_t,
             sigma_prime_t,
-            dt,
-            dwt,
             alpha_ratio_t,
             sigma_ratio_t,
             diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = alpha_ratio_t * x + sigma_t * diff_ratio_t * eps(
-            x, self._fix_t_shape(x, t)
-        )
-        return x + drift_t * dt
+        ) = self._get_step_quantities(idx, zs, ts)
+        eps_x_t = self.vector_field(x, t)
+        drift_t = alpha_ratio_t * x + sigma_t * diff_ratio_t * eps_x_t
+        x_next = x + drift_t * dt
+        return x_next
 
-    def sample_step_stochastic_eps(
-        self,
-        eps: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
+    def _sample_step_eps_stochastic(
+        self, idx: int, x: Array, zs: Array, ts: Array
+    ) -> Array:
         """
-        Perform one step of stochastic sampling using the eps vector field.
+        Perform one stochastic Euler-Maruyama step using the EPS (epsilon/noise) vector field.
+        Corresponds to discretizing the reverse SDE derived using the EPS field.
 
         Args:
-            eps (VectorField): The eps vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
+            idx (int): Current step index.
+            x (Array[*data_dims]): Current state tensor at time ts[idx].
+            zs (Array[num_steps, *data_dims]): Noise tensors. Uses zs[idx].
+            ts (Array[num_steps+1]): Time schedule.
 
         Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+            Array[*data_dims]: Next state tensor at time ts[idx+1].
         """
         (
             t,
             t1,
+            dt,
+            dw_t,
             alpha_t,
             sigma_t,
             alpha_prime_t,
             sigma_prime_t,
-            dt,
-            dwt,
             alpha_ratio_t,
             sigma_ratio_t,
             diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = alpha_ratio_t * x + 2 * sigma_t * diff_ratio_t * eps(
-            x, self._fix_t_shape(x, t)
-        )
-        diffusion_t = torch.sqrt(2 * diff_ratio_t) * sigma_t
-        return x + drift_t * dt + diffusion_t * dwt
+        ) = self._get_step_quantities(idx, zs, ts)
+        eps_x_t = self.vector_field(x, t)
+        drift_t = alpha_ratio_t * x + 2 * sigma_t * diff_ratio_t * eps_x_t
+        diffusion_t = jnp.sqrt(2 * diff_ratio_t) * sigma_t
+        x_next = x + drift_t * dt + diffusion_t * dw_t
+        return x_next
 
-    def sample_step_deterministic_v(
-        self,
-        v: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
+    def _sample_step_v_deterministic(
+        self, idx: int, x: Array, zs: Array, ts: Array
+    ) -> Array:
         """
-        Perform one step of deterministic sampling using the v vector field.
+        Perform one deterministic Euler step using the V (velocity) vector field.
+        Corresponds to the probability flow ODE associated with the V SDE.
 
         Args:
-            v (VectorField): The velocity vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors (unused in deterministic sampling), of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
+            idx (int): Current step index.
+            x (Array[*data_dims]): Current state tensor at time ts[idx].
+            zs (Array[num_steps, *data_dims]): Noise tensors (unused).
+            ts (Array[num_steps+1]): Time schedule.
 
         Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+            Array[*data_dims]: Next state tensor at time ts[idx+1].
         """
         (
             t,
             t1,
+            dt,
+            dw_t,
             alpha_t,
             sigma_t,
             alpha_prime_t,
             sigma_prime_t,
-            dt,
-            dwt,
             alpha_ratio_t,
             sigma_ratio_t,
             diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = v(x, self._fix_t_shape(x, t))
-        return x + drift_t * dt
+        ) = self._get_step_quantities(idx, zs, ts)
+        v_x_t = self.vector_field(x, t)
+        drift_t = v_x_t
+        x_next = x + drift_t * dt
+        return x_next
 
-    def sample_step_stochastic_v(
-        self,
-        v: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
+    def _sample_step_v_stochastic(
+        self, idx: int, x: Array, zs: Array, ts: Array
+    ) -> Array:
         """
-        Perform one step of stochastic sampling using the v vector field.
+        Perform one stochastic Euler-Maruyama step using the V (velocity) vector field.
+        Corresponds to discretizing the reverse SDE derived using the V field.
 
         Args:
-            v (VectorField): The velocity vector field model
-            x (torch.Tensor): The current state, of shape (N, *D)
-            zs (torch.Tensor): The noise tensors, of shape (L-1, N, *D)
-            idx (int): The current step index
-            ts (torch.Tensor): The time steps tensor, of shape (L,)
+            idx (int): Current step index.
+            x (Array[*data_dims]): Current state tensor at time ts[idx].
+            zs (Array[num_steps, *data_dims]): Noise tensors. Uses zs[idx].
+            ts (Array[num_steps+1]): Time schedule.
 
         Returns:
-            torch.Tensor: The next state after one sampling step, of shape (N, *D)
+            Array[*data_dims]: Next state tensor at time ts[idx+1].
         """
         (
             t,
             t1,
+            dt,
+            dw_t,
             alpha_t,
             sigma_t,
             alpha_prime_t,
             sigma_prime_t,
-            dt,
-            dwt,
             alpha_ratio_t,
             sigma_ratio_t,
             diff_ratio_t,
-        ) = self._get_step_quantities(zs, idx, ts)
-        drift_t = -alpha_ratio_t * x + v(x, self._fix_t_shape(x, t))
-        diffusion_t = torch.sqrt(2 * diff_ratio_t) * sigma_t
-        return x + drift_t * dt + diffusion_t * dwt
+        ) = self._get_step_quantities(idx, zs, ts)
+        v_x_t = self.vector_field(x, t)
+        drift_t = -alpha_ratio_t * x + 2 * v_x_t
+        diffusion_t = jnp.sqrt(2 * diff_ratio_t) * sigma_t
+        x_next = x + drift_t * dt + diffusion_t * dw_t
+        return x_next
 
 
 class DDMSampler(Sampler):
     """
-    Class for sampling from diffusion models using the DDPM/DDIM sampler.
+    Class for sampling from diffusion models using the Denoising Diffusion Probabilistic Models (DDPM)
+    or Denoising Diffusion Implicit Models (DDIM) sampling strategy.
+
+    This sampler first converts any given vector field type (SCORE, X0, EPS, V) provided by
+    `vector_field` into an equivalent x0 prediction using the `convert_vector_field_type` utility.
+    Then, it applies the DDPM (if `use_stochastic_sampler` is True) or DDIM (if `use_stochastic_sampler` is False)
+    update rule based on this x0 prediction.
+
+    Attributes:
+        diffusion_process (DiffusionProcess): The diffusion process defining the forward dynamics.
+        vector_field (Callable[[Array[*data_dims], Array[]], Array[*data_dims]]): The function predicting the vector field.
+        vector_field_type (VectorFieldType): The type of the vector field predicted by `vector_field`.
+        use_stochastic_sampler (bool): If True, uses DDPM (stochastic); otherwise, uses DDIM (deterministic).
+        sample_step (Callable[[int, Array, Array, Array], Array]): The DDPM or DDIM step function.
     """
 
-    def _convert_to_x0(
-        self,
-        x: torch.Tensor,
-        t: torch.Tensor,
-        fx: torch.Tensor,
-        fx_type: VectorFieldType,
-    ):
-        x0 = convert_vector_field_type(
-            x,
-            fx,
-            self.diffusion_process.alpha(t),
-            self.diffusion_process.sigma(t),
-            self.diffusion_process.alpha_prime(t),
-            self.diffusion_process.sigma_prime(t),
-            fx_type,
-            VectorFieldType.X0,
-        )
-        return x0
+    def get_sample_step_function(self) -> Callable[[int, Array, Array, Array], Array]:
+        """
+        Get the appropriate DDPM/DDIM sampling step function based on stochasticity.
 
-    def _ddpm_step_x0_tensor(
-        self,
-        x0: torch.Tensor,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        t = pad_shape_back(ts[idx], x.shape)
-        t1 = pad_shape_back(ts[idx + 1], x.shape)
+        Returns:
+            Callable[[int, Array, Array, Array], Array]: The DDPM (stochastic) or DDIM (deterministic) step function.
+                Input signature: (idx: int, x: Array[*data_dims], zs: Array[num_steps, *data_dims], ts: Array[num_steps+1])
+                Output: Array[*data_dims] (the state at the next timestep)
+        """
+        if self.use_stochastic_sampler:
+            return self._sample_step_stochastic
+        else:
+            return self._sample_step_deterministic
+
+    def _get_x0_prediction(self, x: Array, t: Array) -> Array:
+        """
+        Predict the initial state x0 from the current noisy state x at time t.
+
+        This uses the provided `vector_field` function and its `vector_field_type`
+        to compute the prediction, converting it to an X0 prediction if necessary.
+
+        Args:
+            x (Array[*data_dims]): The current state tensor.
+            t (Array[]): The current time.
+
+        Returns:
+            Array[*data_dims]: The predicted initial state x0.
+        """
         alpha_t = self.diffusion_process.alpha(t)
         sigma_t = self.diffusion_process.sigma(t)
-        alpha_t1 = self.diffusion_process.alpha(t1)
-        sigma_t1 = self.diffusion_process.sigma(t1)
+        alpha_prime_t = self.diffusion_process.alpha_prime(t)
+        sigma_prime_t = self.diffusion_process.sigma_prime(t)
+        f_x_t = self.vector_field(x, t)
+        x0_x_t = convert_vector_field_type(
+            x,
+            f_x_t,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            self.vector_field_type,
+            VectorFieldType.X0,
+        )
+        return x0_x_t
 
-        r11 = (alpha_t / alpha_t1) * (sigma_t1 / sigma_t)
-        r12 = r11 * (sigma_t1 / sigma_t)
-        r22 = r12 * (alpha_t / alpha_t1)
+    def _sample_step_deterministic(
+        self, idx: int, x: Array, zs: Array, ts: Array
+    ) -> Array:
+        """
+        Perform one deterministic DDIM sampling step.
 
-        mean = r12 * x + alpha_t1 * (1 - r22) * x0
-        std = sigma_t1 * (1 - r11**2) ** (1 / 2)
-        return mean + std * zs[idx]
+        This involves predicting x0 from the current state (x, t) and then applying
+        the DDIM update rule to get the state at the next timestep t1.
 
-    def _ddim_step_x0_tensor(
-        self,
-        x0: torch.Tensor,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        t = pad_shape_back(ts[idx], x.shape)
-        t1 = pad_shape_back(ts[idx + 1], x.shape)
+        Args:
+            idx (int): The current step index (corresponds to time ts[idx]).
+            x (Array[*data_dims]): The current state tensor at time ts[idx].
+            zs (Array[num_steps, *data_dims]): Noise tensors (unused in DDIM).
+            ts (Array[num_steps+1]): The time schedule for sampling.
+
+        Returns:
+            Array[*data_dims]: The next state tensor at time ts[idx+1] after applying the DDIM update.
+        """
+        t = ts[idx]
+        x0_x_t = self._get_x0_prediction(x, t)
+
+        t1 = ts[idx + 1]
         alpha_t = self.diffusion_process.alpha(t)
         sigma_t = self.diffusion_process.sigma(t)
         alpha_t1 = self.diffusion_process.alpha(t1)
@@ -832,105 +592,44 @@ class DDMSampler(Sampler):
         r01 = sigma_t1 / sigma_t
         r11 = (alpha_t / alpha_t1) * r01
 
-        mean = r01 * x + alpha_t1 * (1 - r11) * x0
-        return mean
+        mean = r01 * x + alpha_t1 * (1 - r11) * x0_x_t
+        x_next = mean
+        return x_next
 
-    def sample_step_deterministic_x0(
-        self,
-        x0: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        x0_value = x0(x, self._fix_t_shape(x, ts[idx]))
-        return self._ddim_step_x0_tensor(x0_value, x, zs, idx, ts)
+    def _sample_step_stochastic(
+        self, idx: int, x: Array, zs: Array, ts: Array
+    ) -> Array:
+        """
+        Perform one stochastic DDPM sampling step.
 
-    def sample_step_stochastic_x0(
-        self,
-        x0: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        x0_value = x0(x, self._fix_t_shape(x, ts[idx]))
-        return self._ddpm_step_x0_tensor(x0_value, x, zs, idx, ts)
+        This involves predicting x0 from the current state (x, t), and then applying
+        the DDPM update rule, which corresponds to sampling from the conditional
+        distribution p(x_{t-1}|x_t, x_0), adding noise scaled by sigma_t.
 
-    def sample_step_deterministic_score(
-        self,
-        score: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        t = pad_shape_back(ts[idx], x.shape)
-        score_value = score(x, self._fix_t_shape(x, t))
-        x0_value = self._convert_to_x0(x, t, score_value, VectorFieldType.SCORE)
-        return self._ddim_step_x0_tensor(x0_value, x, zs, idx, ts)
+        Args:
+            idx (int): The current step index (corresponds to time ts[idx]).
+            x (Array[*data_dims]): The current state tensor at time ts[idx].
+            zs (Array[num_steps, *data_dims]): Noise tensors. Uses zs[idx].
+            ts (Array[num_steps+1]): The time schedule for sampling.
 
-    def sample_step_stochastic_score(
-        self,
-        score: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        t = pad_shape_back(ts[idx], x.shape)
-        score_value = score(x, self._fix_t_shape(x, t))
-        x0_value = self._convert_to_x0(x, t, score_value, VectorFieldType.SCORE)
-        return self._ddpm_step_x0_tensor(x0_value, x, zs, idx, ts)
+        Returns:
+            Array[*data_dims]: The next state tensor at time ts[idx+1] after applying the DDPM update.
+        """
+        t = ts[idx]
+        x0_x_t = self._get_x0_prediction(x, t)
+        z_t = zs[idx]
 
-    def sample_step_deterministic_eps(
-        self,
-        eps: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        t = pad_shape_back(ts[idx], x.shape)
-        eps_value = eps(x, self._fix_t_shape(x, t))
-        x0_value = self._convert_to_x0(x, t, eps_value, VectorFieldType.EPS)
-        return self._ddpm_step_x0_tensor(x0_value, x, zs, idx, ts)
+        t1 = ts[idx + 1]
+        alpha_t = self.diffusion_process.alpha(t)
+        sigma_t = self.diffusion_process.sigma(t)
+        alpha_t1 = self.diffusion_process.alpha(t1)
+        sigma_t1 = self.diffusion_process.sigma(t1)
 
-    def sample_step_stochastic_eps(
-        self,
-        eps: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        t = pad_shape_back(ts[idx], x.shape)
-        eps_value = eps(x, self._fix_t_shape(x, t))
-        x0_value = self._convert_to_x0(x, t, eps_value, VectorFieldType.EPS)
-        return self._ddpm_step_x0_tensor(x0_value, x, zs, idx, ts)
+        r11 = (alpha_t / alpha_t1) * (sigma_t1 / sigma_t)
+        r12 = r11 * (sigma_t1 / sigma_t)
+        r22 = (alpha_t / alpha_t1) * r12
 
-    def sample_step_deterministic_v(
-        self,
-        v: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        t = pad_shape_back(ts[idx], x.shape)
-        v_value = v(x, self._fix_t_shape(x, t))
-        x0_value = self._convert_to_x0(x, t, v_value, VectorFieldType.V)
-        return self._ddim_step_x0_tensor(x0_value, x, zs, idx, ts)
-
-    def sample_step_stochastic_v(
-        self,
-        v: VectorField,
-        x: torch.Tensor,
-        zs: torch.Tensor,
-        idx: int,
-        ts: torch.Tensor,
-    ) -> torch.Tensor:
-        t = pad_shape_back(ts[idx], x.shape)
-        v_value = v(x, self._fix_t_shape(x, t))
-        x0_value = self._convert_to_x0(x, t, v_value, VectorFieldType.V)
-        return self._ddpm_step_x0_tensor(x0_value, x, zs, idx, ts)
+        mean = r12 * x + alpha_t1 * (1 - r22) * x0_x_t
+        std = sigma_t1 * (1 - (r11**2)) ** (1 / 2)
+        x_next = mean + std * z_t
+        return x_next

@@ -1,843 +1,1102 @@
-import torch
 import pytest
-from unittest.mock import MagicMock, patch
+import jax
+import jax.numpy as jnp
+from numpy.testing import assert_allclose
+from typing import Callable
 
-from diffusionlab.diffusions import DiffusionProcess
+from diffusionlab.dynamics import VariancePreservingProcess
+from diffusionlab.vector_fields import VectorFieldType, convert_vector_field_type
 from diffusionlab.samplers import Sampler, EulerMaruyamaSampler, DDMSampler
-from diffusionlab.vector_fields import VectorField, VectorFieldType
+
+
+# --- Test Classes (Self-contained) ---
 
 
 class TestSampler:
-    def test_initialization(self):
-        """Test basic initialization of Sampler."""
-        # Create a mock diffusion process
-        alpha = lambda t: torch.ones_like(t)
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+    """Tests for the base Sampler class. Tests define dependencies internally."""
 
-        # Initialize sampler
-        is_stochastic = True
-        sampler = Sampler(diffusion_process, is_stochastic)
+    def test_init(self):
+        """Test sampler initialization and sample_step assignment."""
+        simple_vp_process = VariancePreservingProcess()
+        identity_vector_field = lambda x, t: x
 
-        # Check attributes
-        assert sampler.diffusion_process is diffusion_process
-        assert sampler.is_stochastic is is_stochastic
+        # Minimal mock sampler defined locally for this test scope
+        class MockSampler(Sampler):
+            def get_sample_step_function(
+                self,
+            ) -> Callable[[int, jax.Array, jax.Array, jax.Array], jax.Array]:
+                return lambda idx, x, zs, ts: x + 1.0  # Simple step
 
-        # The alpha, sigma, alpha_prime, and sigma_prime attributes are now part of the diffusion process
-        # and not directly accessible from the sampler
+        sampler = MockSampler(
+            diffusion_process=simple_vp_process,
+            vector_field=identity_vector_field,
+            vector_field_type=VectorFieldType.V,  # Arbitrary for this test
+            use_stochastic_sampler=False,
+        )
+        assert sampler.sample_step is not None
+        # Indirectly test assignment via sample/sample_trajectory
 
-    def test_get_sample_step_function(self):
-        """Test that get_sample_step_function returns the correct function."""
-        # Create a mock diffusion process
-        alpha = lambda t: torch.ones_like(t)
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+    def test_sample(self):
+        """Test the sample method executes the loop correctly."""
+        simple_vp_process = VariancePreservingProcess()
+        identity_vector_field = lambda x, t: x
 
-        # Test stochastic sampler
-        sampler = Sampler(diffusion_process, True)
+        class MockSampler(Sampler):
+            def get_sample_step_function(
+                self,
+            ) -> Callable[[int, jax.Array, jax.Array, jax.Array], jax.Array]:
+                return lambda idx, x, zs, ts: x + 1.0
 
-        # Create dummy inputs for testing
-        vector_field_mock = MagicMock(spec=VectorField)
-        x_mock = torch.zeros(1)
-        zs_mock = torch.zeros(1, 1)
-        ts_mock = torch.zeros(1)
+        num_steps = 5
+        data_shape = (2, 3)
+        key = jax.random.key(0)
+        x_init = jax.random.normal(key, data_shape)  # Shape: (2, 3)
+        zs = jax.random.normal(key, (num_steps,) + data_shape)  # Shape: (5, 2, 3)
+        ts = jnp.linspace(1.0, 0.0, num_steps + 1)  # Shape: (6,)
 
-        # Patch the sample step functions to return identifiable values
-        with (
-            patch.object(
-                sampler, "sample_step_stochastic_score", return_value="stochastic_score"
-            ),
-            patch.object(
-                sampler, "sample_step_stochastic_x0", return_value="stochastic_x0"
-            ),
-            patch.object(
-                sampler, "sample_step_stochastic_eps", return_value="stochastic_eps"
-            ),
-            patch.object(
-                sampler, "sample_step_stochastic_v", return_value="stochastic_v"
-            ),
-        ):
-            # Test each vector field type
-            assert (
-                sampler.get_sample_step_function(VectorFieldType.SCORE)(
-                    vector_field_mock, x_mock, zs_mock, 0, ts_mock
-                )
-                == "stochastic_score"
-            )
-            assert (
-                sampler.get_sample_step_function(VectorFieldType.X0)(
-                    vector_field_mock, x_mock, zs_mock, 0, ts_mock
-                )
-                == "stochastic_x0"
-            )
-            assert (
-                sampler.get_sample_step_function(VectorFieldType.EPS)(
-                    vector_field_mock, x_mock, zs_mock, 0, ts_mock
-                )
-                == "stochastic_eps"
-            )
-            assert (
-                sampler.get_sample_step_function(VectorFieldType.V)(
-                    vector_field_mock, x_mock, zs_mock, 0, ts_mock
-                )
-                == "stochastic_v"
-            )
+        sampler = MockSampler(
+            diffusion_process=simple_vp_process,
+            vector_field=identity_vector_field,
+            vector_field_type=VectorFieldType.V,
+            use_stochastic_sampler=False,
+        )
 
-        # Test deterministic sampler
-        sampler = Sampler(diffusion_process, False)
+        final_x = sampler.sample(x_init, zs, ts)  # Shape: (2, 3)
 
-        # Patch the sample step functions to return identifiable values
-        with (
-            patch.object(
-                sampler,
-                "sample_step_deterministic_score",
-                return_value="deterministic_score",
-            ),
-            patch.object(
-                sampler, "sample_step_deterministic_x0", return_value="deterministic_x0"
-            ),
-            patch.object(
-                sampler,
-                "sample_step_deterministic_eps",
-                return_value="deterministic_eps",
-            ),
-            patch.object(
-                sampler, "sample_step_deterministic_v", return_value="deterministic_v"
-            ),
-        ):
-            # Test each vector field type
-            assert (
-                sampler.get_sample_step_function(VectorFieldType.SCORE)(
-                    vector_field_mock, x_mock, zs_mock, 0, ts_mock
-                )
-                == "deterministic_score"
-            )
-            assert (
-                sampler.get_sample_step_function(VectorFieldType.X0)(
-                    vector_field_mock, x_mock, zs_mock, 0, ts_mock
-                )
-                == "deterministic_x0"
-            )
-            assert (
-                sampler.get_sample_step_function(VectorFieldType.EPS)(
-                    vector_field_mock, x_mock, zs_mock, 0, ts_mock
-                )
-                == "deterministic_eps"
-            )
-            assert (
-                sampler.get_sample_step_function(VectorFieldType.V)(
-                    vector_field_mock, x_mock, zs_mock, 0, ts_mock
-                )
-                == "deterministic_v"
-            )
+        # Expect final_x = x_init + num_steps * 1.0
+        expected_final_x = x_init + float(num_steps)
+        assert final_x.shape == data_shape
+        assert_allclose(final_x, expected_final_x, atol=1e-6)
 
-    def test_fix_t_shape(self):
-        """Test the _fix_t_shape helper method."""
-        # Create a mock diffusion process
-        alpha = lambda t: torch.ones_like(t)
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+    def test_sample_trajectory(self):
+        """Test the sample_trajectory method executes the loop correctly."""
+        simple_vp_process = VariancePreservingProcess()
+        identity_vector_field = lambda x, t: x
 
-        sampler = Sampler(diffusion_process, True)
+        class MockSampler(Sampler):
+            def get_sample_step_function(
+                self,
+            ) -> Callable[[int, jax.Array, jax.Array, jax.Array], jax.Array]:
+                return lambda idx, x, zs, ts: x + 1.0
 
-        # Test with various shapes
-        batch_size = 5
-        x = torch.randn(batch_size, 3)
-        t = torch.tensor([0.5])
+        num_steps = 3
+        data_shape = (4,)
+        key = jax.random.key(1)
+        x_init = jax.random.normal(key, data_shape)  # Shape: (4,)
+        zs = jax.random.normal(key, (num_steps,) + data_shape)  # Shape: (3, 4,)
+        ts = jnp.linspace(1.0, 0.1, num_steps + 1)  # Shape: (4,)
 
-        reshaped_t = sampler._fix_t_shape(x, t)
+        sampler = MockSampler(
+            diffusion_process=simple_vp_process,
+            vector_field=identity_vector_field,
+            vector_field_type=VectorFieldType.V,
+            use_stochastic_sampler=False,
+        )
 
-        assert reshaped_t.shape == (batch_size,)
-        assert torch.allclose(reshaped_t, torch.ones(batch_size) * 0.5)
+        trajectory = sampler.sample_trajectory(x_init, zs, ts)  # Shape: (4, 4,)
 
-    def test_sample_with_mocked_step_function(self):
-        """Test that sample calls the step function correctly."""
-        # Create a mock diffusion process
-        alpha = lambda t: torch.ones_like(t)
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+        expected_trajectory_shape = (num_steps + 1,) + data_shape
+        assert trajectory.shape == expected_trajectory_shape
 
-        # Initialize sampler
-        sampler = Sampler(diffusion_process, True)
+        # Check values: trajectory[i] = x_init + i * 1.0
+        expected_trajectory = jnp.array(
+            [x_init + float(i) for i in range(num_steps + 1)]
+        )
+        assert_allclose(trajectory, expected_trajectory, atol=1e-6)
 
-        # Create mock vector field
-        vector_field = MagicMock(spec=VectorField)
-        vector_field.vector_field_type = VectorFieldType.X0
+    def test_get_sample_step_function_abstract(self):
+        """Test that the base class raises NotImplementedError."""
+        simple_vp_process = VariancePreservingProcess()
+        identity_vector_field = lambda x, t: x
 
-        # Create mock inputs
-        batch_size = 2
-        data_dim = 3
-        num_steps = 4
-        x_t = torch.randn(batch_size, data_dim)
-        zs = torch.randn(num_steps - 1, batch_size, data_dim)
-
-        # Create time steps
-        ts = torch.linspace(1, 0, num_steps)
-
-        # Mock the step function
-        mock_step_fn = MagicMock(return_value=torch.zeros(batch_size, data_dim))
-
-        # Patch the get_sample_step_function to return our mock
-        with patch.object(
-            sampler, "get_sample_step_function", return_value=mock_step_fn
-        ):
-            # Call sample
-            result = sampler.sample(vector_field, x_t, zs, ts)
-
-            # Check that step function was called correct number of times
-            assert mock_step_fn.call_count == num_steps - 1
-
-            # Check that step function was called with correct arguments
-            for i in range(num_steps - 1):
-                args, _ = mock_step_fn.call_args_list[i]
-                assert args[0] is vector_field
-                assert torch.allclose(
-                    args[1], mock_step_fn.return_value if i > 0 else x_t
-                )
-                assert args[2] is zs
-                assert args[3] == i
-                assert args[4] is ts
-
-            # Check result shape
-            assert result.shape == (batch_size, data_dim)
-            assert torch.allclose(result, mock_step_fn.return_value)
-
-    def test_sample_trajectory_with_mocked_step_function(self):
-        """Test that sample_trajectory calls the step function correctly and returns the trajectory."""
-        # Create a mock diffusion process
-        alpha = lambda t: torch.ones_like(t)
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize sampler
-        sampler = Sampler(diffusion_process, True)
-
-        # Create mock vector field
-        vector_field = MagicMock(spec=VectorField)
-        vector_field.vector_field_type = VectorFieldType.X0
-
-        # Create mock inputs
-        batch_size = 2
-        data_dim = 3
-        num_steps = 4
-        x_t = torch.randn(batch_size, data_dim)
-        zs = torch.randn(num_steps - 1, batch_size, data_dim)
-
-        # Create time steps
-        ts = torch.linspace(1, 0, num_steps)
-
-        # Create different return values for each step
-        step_returns = [
-            torch.full((batch_size, data_dim), i, dtype=zs.dtype)
-            for i in range(num_steps - 1)
-        ]
-        mock_step_fn = MagicMock(side_effect=step_returns)
-
-        # Patch the get_sample_step_function to return our mock
-        with patch.object(
-            sampler, "get_sample_step_function", return_value=mock_step_fn
-        ):
-            # Call sample_trajectory
-            result = sampler.sample_trajectory(vector_field, x_t, zs, ts)
-
-            # Check that step function was called correct number of times
-            assert mock_step_fn.call_count == num_steps - 1
-
-            # Check result shape
-            assert result.shape == (num_steps, batch_size, data_dim)
-
-            # Check that the trajectory contains the initial x_t and all step results
-            assert torch.allclose(result[0], x_t)
-            for i in range(num_steps - 1):
-                assert torch.allclose(result[i + 1], step_returns[i])
-
-    def test_unimplemented_sample_step_methods(self):
-        """Test that the sample step methods raise NotImplementedError."""
-        # Create a mock diffusion process
-        alpha = lambda t: torch.ones_like(t)
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        sampler = Sampler(diffusion_process, True)
-
-        # Create dummy inputs
-        vector_field = MagicMock(spec=VectorField)
-        x = torch.randn(5, 3)
-        zs = torch.randn(2, 5, 3)
-        idx = 0
-        ts = torch.tensor([1.0, 0.5, 0.0])
-
-        # Test all the unimplemented methods
-        with pytest.raises(NotImplementedError):
-            sampler.sample_step_stochastic_score(vector_field, x, zs, idx, ts)
+        # Cannot instantiate Sampler directly, so create a minimal subclass
+        class IncompleteSampler(Sampler):
+            pass  # Missing get_sample_step_function
 
         with pytest.raises(NotImplementedError):
-            sampler.sample_step_deterministic_score(vector_field, x, zs, idx, ts)
-
-        with pytest.raises(NotImplementedError):
-            sampler.sample_step_stochastic_x0(vector_field, x, zs, idx, ts)
-
-        with pytest.raises(NotImplementedError):
-            sampler.sample_step_deterministic_x0(vector_field, x, zs, idx, ts)
-
-        with pytest.raises(NotImplementedError):
-            sampler.sample_step_stochastic_eps(vector_field, x, zs, idx, ts)
-
-        with pytest.raises(NotImplementedError):
-            sampler.sample_step_deterministic_eps(vector_field, x, zs, idx, ts)
-
-        with pytest.raises(NotImplementedError):
-            sampler.sample_step_stochastic_v(vector_field, x, zs, idx, ts)
-
-        with pytest.raises(NotImplementedError):
-            sampler.sample_step_deterministic_v(vector_field, x, zs, idx, ts)
+            # Error should happen during __post_init__ call to get_sample_step_function
+            IncompleteSampler(
+                diffusion_process=simple_vp_process,
+                vector_field=identity_vector_field,
+                vector_field_type=VectorFieldType.V,
+                use_stochastic_sampler=False,
+            )
 
 
 class TestEulerMaruyamaSampler:
-    def test_initialization(self):
-        """Test basic initialization of EulerMaruyamaSampler."""
-        # Create a mock diffusion process
-        alpha = lambda t: torch.ones_like(t)
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+    """Tests for the EulerMaruyamaSampler class. Dependencies defined internally."""
 
-        # Initialize sampler
-        is_stochastic = True
-        sampler = EulerMaruyamaSampler(diffusion_process, is_stochastic)
+    # Define common test data as class attributes for convenience
+    data_shape = (2, 2)
+    num_steps = 4
+    key = jax.random.key(42)
+    x_init = jax.random.normal(key, data_shape)  # Shape: (2, 2)
+    zs = jax.random.normal(key, (num_steps,) + data_shape)  # Shape: (4, 2, 2)
+    # Use non-uniform timesteps to catch potential bugs
+    ts = jnp.array([1.0, 0.7, 0.5, 0.2, 0.0])  # Shape: (5,)
+    idx = 1  # Corresponds to t=0.7 -> t1=0.5
 
-        # Check attributes
-        assert sampler.diffusion_process is diffusion_process
-        assert sampler.is_stochastic is is_stochastic
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    @pytest.mark.parametrize("vf_type", VectorFieldType)
+    def test_get_sample_step_function_selection(self, vf_type, use_stochastic):
+        """Test that the correct internal step function is selected."""
+        simple_vp_process = VariancePreservingProcess()
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
 
-        # The alpha, sigma, alpha_prime, and sigma_prime attributes are now part of the diffusion process
-        # and not directly accessible from the sampler
+        sampler = EulerMaruyamaSampler(
+            diffusion_process=simple_vp_process,
+            vector_field=zero_vector_field,  # Field content doesn't matter here
+            vector_field_type=vf_type,
+            use_stochastic_sampler=use_stochastic,
+        )
+        expected_func_name = f"_sample_step_{vf_type.name.lower()}_{'stochastic' if use_stochastic else 'deterministic'}"
+        expected_func = getattr(sampler, expected_func_name)
+        assert sampler.sample_step == expected_func
+
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    def test_get_sample_step_function_selection_with_undefined_vf_type(
+        self, use_stochastic
+    ):
+        """Test that the correct internal step function is selected."""
+        simple_vp_process = VariancePreservingProcess()
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
+
+        with pytest.raises(ValueError, match="Unsupported vector field type"):
+            EulerMaruyamaSampler(
+                diffusion_process=simple_vp_process,
+                vector_field=zero_vector_field,  # Field content doesn't matter here
+                vector_field_type=None,
+                use_stochastic_sampler=use_stochastic,
+            )
 
     def test_get_step_quantities(self):
-        """Test the _get_step_quantities method."""
-        # Create a mock diffusion process with known functions
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+        """Test the calculation of intermediate quantities."""
+        simple_vp_process = VariancePreservingProcess()
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, zero_vector_field, VectorFieldType.SCORE, False
+        )
 
-        # Initialize sampler
-        sampler = EulerMaruyamaSampler(diffusion_process, True)
+        idx = self.idx  # 1
+        t = self.ts[idx]  # 0.7
+        t1 = self.ts[idx + 1]  # 0.5
+        dt = t1 - t  # -0.2
+        dw_t = self.zs[idx] * jnp.sqrt(-dt)
 
-        # Create test inputs
-        batch_size = 2
-        data_dim = 3
-        num_steps = 3
-        zs = torch.ones(num_steps - 1, batch_size, data_dim)
-        idx = 0
-        ts = torch.tensor([1.0, 0.5, 0.0])
+        alpha_t = simple_vp_process.alpha(t)
+        sigma_t = simple_vp_process.sigma(t)
+        alpha_prime_t = simple_vp_process.alpha_prime(t)
+        sigma_prime_t = simple_vp_process.sigma_prime(t)
+        alpha_ratio_t = alpha_prime_t / alpha_t
+        sigma_ratio_t = sigma_prime_t / sigma_t
+        diff_ratio_t = sigma_ratio_t - alpha_ratio_t
 
-        # Call the method
-        result = sampler._get_step_quantities(zs, idx, ts)
+        actual = sampler._get_step_quantities(self.idx, self.zs, self.ts)
 
-        # Unpack the result
-        (
+        expected = (
             t,
             t1,
+            dt,
+            dw_t,
             alpha_t,
             sigma_t,
             alpha_prime_t,
             sigma_prime_t,
-            dt,
-            dwt,
             alpha_ratio_t,
             sigma_ratio_t,
             diff_ratio_t,
-        ) = result
+        )
 
-        # Check shapes
-        assert t.shape == (1, 1)
-        assert t1.shape == (1, 1)
-        assert alpha_t.shape == (1, 1)
-        assert sigma_t.shape == (1, 1)
-        assert alpha_prime_t.shape == (1, 1)
-        assert sigma_prime_t.shape == (1, 1)
-        assert dt.shape == (1, 1)
-        assert dwt.shape == (batch_size, data_dim)
-        assert alpha_ratio_t.shape == (1, 1)
-        assert sigma_ratio_t.shape == (1, 1)
-        assert diff_ratio_t.shape == (1, 1)
+        for act, exp in zip(actual, expected):
+            assert_allclose(act, exp, atol=1e-6, rtol=1e-6)
 
-        # Check values
-        assert torch.allclose(t, torch.ones(batch_size, data_dim))
-        assert torch.allclose(t1, torch.ones(batch_size, data_dim) * 0.5)
-        assert torch.allclose(
-            alpha_t, torch.zeros(batch_size, data_dim)
-        )  # alpha(1.0) = 1 - 1.0 = 0
-        assert torch.allclose(
-            sigma_t, torch.ones(batch_size, data_dim)
-        )  # sigma(1.0) = 1.0
-        assert torch.allclose(
-            alpha_prime_t, -torch.ones(batch_size, data_dim)
-        )  # d/dt(1-t) = -1
-        assert torch.allclose(
-            sigma_prime_t, torch.ones(batch_size, data_dim)
-        )  # d/dt(t) = 1
-        assert torch.allclose(
-            dt, torch.ones(batch_size, data_dim) * -0.5
-        )  # t1 - t = 0.5 - 1.0 = -0.5
-        assert torch.allclose(
-            dwt, torch.ones(batch_size, data_dim) * torch.sqrt(torch.tensor(0.5))
-        )  # zs * sqrt(-dt)
+    # --- Individual Step Function Tests ---
+    # We use simple vector fields (zero or identity) and a known process (VP)
+    # defined locally within each test.
 
-        # For alpha_ratio_t = alpha_prime_t / alpha_t, we have division by zero
-        # So we skip this check
+    def test_sample_step_score_deterministic(self):
+        simple_vp_process = VariancePreservingProcess()
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, zero_vector_field, VectorFieldType.SCORE, False
+        )
+        x = self.x_init
+        (
+            t,
+            t1,
+            dt,
+            _,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = sampler._get_step_quantities(self.idx, self.zs, self.ts)
+        score_x_t = zero_vector_field(x, t)  # 0
+        drift_t = alpha_ratio_t * x - (sigma_t**2) * diff_ratio_t * score_x_t
+        expected_x_next = x + drift_t * dt
 
-        # For sigma_ratio_t = sigma_prime_t / sigma_t = 1 / 1 = 1
-        assert torch.allclose(sigma_ratio_t, torch.ones(batch_size, data_dim))
+        actual_x_next = sampler._sample_step_score_deterministic(
+            self.idx, x, self.zs, self.ts
+        )
+        assert_allclose(actual_x_next, expected_x_next, atol=1e-6)
 
-        # For diff_ratio_t = sigma_ratio_t - alpha_ratio_t, we skip due to division by zero in alpha_ratio_t
+    def test_sample_step_score_stochastic(self):
+        simple_vp_process = VariancePreservingProcess()
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, zero_vector_field, VectorFieldType.SCORE, True
+        )
+        x = self.x_init
+        (
+            t,
+            t1,
+            dt,
+            dw_t,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = sampler._get_step_quantities(self.idx, self.zs, self.ts)
+        score_x_t = zero_vector_field(x, t)  # 0
+        drift_t = alpha_ratio_t * x - 2 * (sigma_t**2) * diff_ratio_t * score_x_t
+        diffusion_t = jnp.sqrt(2 * diff_ratio_t) * sigma_t
+        expected_x_next = x + drift_t * dt + diffusion_t * dw_t
 
-    def test_sample_step_deterministic_score(self):
-        """Test the sample_step_deterministic_score method."""
-        # Create a mock diffusion process with simple dynamics
-        alpha = lambda t: torch.ones_like(t)  # Constant alpha = 1
-        sigma = lambda t: t  # Linear sigma = t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+        actual_x_next = sampler._sample_step_score_stochastic(
+            self.idx, x, self.zs, self.ts
+        )
+        assert_allclose(actual_x_next, expected_x_next, atol=1e-6)
 
-        sampler = EulerMaruyamaSampler(diffusion_process, False)
+    def test_sample_step_x0_deterministic(self):
+        simple_vp_process = VariancePreservingProcess()
+        identity_vector_field = lambda x, t: x
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, identity_vector_field, VectorFieldType.X0, False
+        )
+        x = self.x_init
+        (
+            t,
+            t1,
+            dt,
+            _,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = sampler._get_step_quantities(self.idx, self.zs, self.ts)
+        x0_x_t = identity_vector_field(x, t)  # x
+        drift_t = sigma_ratio_t * x - alpha_t * diff_ratio_t * x0_x_t
+        expected_x_next = x + drift_t * dt
 
-        # Create a simple score function that returns -x (score of standard normal)
-        def score_fn(x, t):
-            return -x
+        actual_x_next = sampler._sample_step_x0_deterministic(
+            self.idx, x, self.zs, self.ts
+        )
+        assert_allclose(actual_x_next, expected_x_next, atol=1e-6)
 
-        vector_field = VectorField(score_fn, VectorFieldType.SCORE)
+    def test_sample_step_x0_stochastic(self):
+        simple_vp_process = VariancePreservingProcess()
+        identity_vector_field = lambda x, t: x
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, identity_vector_field, VectorFieldType.X0, True
+        )
+        x = self.x_init
+        (
+            t,
+            t1,
+            dt,
+            dw_t,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = sampler._get_step_quantities(self.idx, self.zs, self.ts)
+        x0_x_t = identity_vector_field(x, t)  # x
+        drift_t = (
+            alpha_ratio_t + 2 * diff_ratio_t
+        ) * x - 2 * alpha_t * diff_ratio_t * x0_x_t
+        diffusion_t = jnp.sqrt(2 * diff_ratio_t) * sigma_t
+        expected_x_next = x + drift_t * dt + diffusion_t * dw_t
 
-        # Create input tensors
-        batch_size = 5
-        data_dim = 3
-        x = torch.randn(batch_size, data_dim)
-        zs = torch.randn(
-            2, batch_size, data_dim
-        )  # L-1 noise tensors (not used in deterministic)
-        idx = 0
-        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
+        actual_x_next = sampler._sample_step_x0_stochastic(
+            self.idx, x, self.zs, self.ts
+        )
+        assert_allclose(actual_x_next, expected_x_next, atol=1e-6)
 
-        # Call the method
-        result = sampler.sample_step_deterministic_score(vector_field, x, zs, idx, ts)
+    def test_sample_step_eps_deterministic(self):
+        simple_vp_process = VariancePreservingProcess()
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, zero_vector_field, VectorFieldType.EPS, False
+        )
+        x = self.x_init
+        (
+            t,
+            t1,
+            dt,
+            _,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = sampler._get_step_quantities(self.idx, self.zs, self.ts)
+        eps_x_t = zero_vector_field(x, t)  # 0
+        drift_t = alpha_ratio_t * x + sigma_t * diff_ratio_t * eps_x_t
+        expected_x_next = x + drift_t * dt
 
-        # Check shape
-        assert result.shape == x.shape
+        actual_x_next = sampler._sample_step_eps_deterministic(
+            self.idx, x, self.zs, self.ts
+        )
+        assert_allclose(actual_x_next, expected_x_next, atol=1e-6)
 
-        # For this test we won't check exact values, as they depend on the complex dynamics
-        # But we can check that the result is different from the input
-        assert not torch.allclose(result, x)
+    def test_sample_step_eps_stochastic(self):
+        simple_vp_process = VariancePreservingProcess()
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, zero_vector_field, VectorFieldType.EPS, True
+        )
+        x = self.x_init
+        (
+            t,
+            t1,
+            dt,
+            dw_t,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = sampler._get_step_quantities(self.idx, self.zs, self.ts)
+        eps_x_t = zero_vector_field(x, t)  # 0
+        drift_t = alpha_ratio_t * x + 2 * sigma_t * diff_ratio_t * eps_x_t
+        diffusion_t = jnp.sqrt(2 * diff_ratio_t) * sigma_t
+        expected_x_next = x + drift_t * dt + diffusion_t * dw_t
 
-    def test_sample_step_deterministic_x0(self):
-        """Test the sample_step_deterministic_x0 method."""
-        # Create a mock diffusion process with simple dynamics
-        alpha = lambda t: torch.ones_like(t)  # Constant alpha = 1
-        sigma = lambda t: t  # Linear sigma = t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+        actual_x_next = sampler._sample_step_eps_stochastic(
+            self.idx, x, self.zs, self.ts
+        )
+        assert_allclose(actual_x_next, expected_x_next, atol=1e-6)
 
-        sampler = EulerMaruyamaSampler(diffusion_process, False)
+    def test_sample_step_v_deterministic(self):
+        simple_vp_process = VariancePreservingProcess()
+        identity_vector_field = lambda x, t: x
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, identity_vector_field, VectorFieldType.V, False
+        )
+        x = self.x_init
+        (
+            t,
+            t1,
+            dt,
+            _,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = sampler._get_step_quantities(self.idx, self.zs, self.ts)
+        v_x_t = identity_vector_field(x, t)  # x
+        drift_t = v_x_t
+        expected_x_next = x + drift_t * dt
 
-        # Create a simple x0 function that returns zeros
-        def x0_fn(x, t):
-            return torch.zeros_like(x)
+        actual_x_next = sampler._sample_step_v_deterministic(
+            self.idx, x, self.zs, self.ts
+        )
+        assert_allclose(actual_x_next, expected_x_next, atol=1e-6)
 
-        vector_field = VectorField(x0_fn, VectorFieldType.X0)
+    def test_sample_step_v_stochastic(self):
+        simple_vp_process = VariancePreservingProcess()
+        identity_vector_field = lambda x, t: x
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, identity_vector_field, VectorFieldType.V, True
+        )
+        x = self.x_init
+        (
+            t,
+            t1,
+            dt,
+            dw_t,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            alpha_ratio_t,
+            sigma_ratio_t,
+            diff_ratio_t,
+        ) = sampler._get_step_quantities(self.idx, self.zs, self.ts)
+        v_x_t = identity_vector_field(x, t)  # x
+        drift_t = -alpha_ratio_t * x + 2 * v_x_t
+        diffusion_t = jnp.sqrt(2 * diff_ratio_t) * sigma_t
+        expected_x_next = x + drift_t * dt + diffusion_t * dw_t
 
-        # Create input tensors
-        batch_size = 5
-        data_dim = 3
-        x = torch.randn(batch_size, data_dim)
-        zs = torch.randn(
-            2, batch_size, data_dim
-        )  # L-1 noise tensors (not used in deterministic)
-        idx = 0
-        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
+        actual_x_next = sampler._sample_step_v_stochastic(self.idx, x, self.zs, self.ts)
+        assert_allclose(actual_x_next, expected_x_next, atol=1e-6, rtol=1e-5)
 
-        # Call the method
-        result = sampler.sample_step_deterministic_x0(vector_field, x, zs, idx, ts)
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    @pytest.mark.parametrize(
+        "type1, type2",
+        [
+            (VectorFieldType.X0, VectorFieldType.SCORE),
+            (VectorFieldType.X0, VectorFieldType.EPS),
+            (VectorFieldType.X0, VectorFieldType.V),
+            (VectorFieldType.SCORE, VectorFieldType.EPS),
+            (VectorFieldType.SCORE, VectorFieldType.V),
+            (VectorFieldType.EPS, VectorFieldType.V),
+        ],
+    )
+    def test_step_consistency_across_vf_types(self, type1, type2, use_stochastic):
+        """Test that EM step is consistent when converting between VF types."""
+        simple_vp_process = VariancePreservingProcess()
+        x = self.x_init
+        t = self.ts[self.idx]
 
-        # Check shape
-        assert result.shape == x.shape
+        # Use a non-trivial base prediction (e.g., predicting v = x*cos(t))
+        def predict_type1(x_in, t_in):
+            return x_in * jnp.cos(t_in)
 
-        # For this test we won't check exact values, as they depend on the complex dynamics
-        # But we can check that the result is different from the input
-        assert not torch.allclose(result, x)
+        pred1 = predict_type1(x, t)
 
-    def test_sample_step_deterministic_eps(self):
-        """Test the sample_step_deterministic_eps method."""
-        # Create a mock diffusion process with simple dynamics
-        alpha = lambda t: torch.ones_like(t)  # Constant alpha = 1
-        sigma = lambda t: t  # Linear sigma = t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+        # Get process quantities needed for conversion
+        alpha_t = simple_vp_process.alpha(t)
+        sigma_t = simple_vp_process.sigma(t)
+        alpha_prime_t = simple_vp_process.alpha_prime(t)
+        sigma_prime_t = simple_vp_process.sigma_prime(t)
 
-        sampler = EulerMaruyamaSampler(diffusion_process, False)
+        # Convert prediction from type1 to type2
+        pred2 = convert_vector_field_type(
+            x, pred1, alpha_t, sigma_t, alpha_prime_t, sigma_prime_t, type1, type2
+        )
 
-        # Create a simple eps function that returns zeros
-        def eps_fn(x, t):
-            return torch.ones_like(x)
+        # Sampler 1 uses the original prediction and type1
+        sampler1 = EulerMaruyamaSampler(
+            diffusion_process=simple_vp_process,
+            vector_field=predict_type1,
+            vector_field_type=type1,
+            use_stochastic_sampler=use_stochastic,
+        )
+        # Sampler 2 uses the converted prediction and type2
+        sampler2 = EulerMaruyamaSampler(
+            diffusion_process=simple_vp_process,
+            vector_field=lambda _x, _t: pred2,  # Use the calculated pred2
+            vector_field_type=type2,
+            use_stochastic_sampler=use_stochastic,
+        )
 
-        vector_field = VectorField(eps_fn, VectorFieldType.EPS)
+        # Get the appropriate step function for each sampler
+        step_func1 = sampler1.get_sample_step_function()
+        step_func2 = sampler2.get_sample_step_function()
 
-        # Create input tensors
-        batch_size = 5
-        data_dim = 3
-        x = torch.randn(batch_size, data_dim)
-        zs = torch.randn(
-            2, batch_size, data_dim
-        )  # L-1 noise tensors (not used in deterministic)
-        idx = 0
-        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
+        # Calculate the next step using both samplers
+        x_next1 = step_func1(self.idx, x, self.zs, self.ts)
+        x_next2 = step_func2(self.idx, x, self.zs, self.ts)
 
-        # Call the method
-        result = sampler.sample_step_deterministic_eps(vector_field, x, zs, idx, ts)
+        # Assert the results are close
+        assert_allclose(x_next1, x_next2, atol=1e-5, rtol=1e-5)
 
-        # Check shape
-        assert result.shape == x.shape
+    # --- JIT / VMAP Tests ---
 
-        # For this test we won't check exact values, as they depend on the complex dynamics
-        # But we can check that the result is different from the input
-        assert not torch.allclose(result, x)
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    @pytest.mark.parametrize("vf_type", VectorFieldType)
+    def test_sample_jit(self, vf_type, use_stochastic):
+        """Test EulerMaruyamaSampler.sample under JIT compilation."""
+        simple_vp_process = VariancePreservingProcess()
+        # Use a field that predicts zeros
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, zero_vector_field, vf_type, use_stochastic
+        )
 
-    def test_sample_step_deterministic_v(self):
-        """Test the sample_step_deterministic_v method."""
-        # Create a mock diffusion process with simple dynamics
-        alpha = lambda t: torch.ones_like(t)  # Constant alpha = 1
-        sigma = lambda t: t  # Linear sigma = t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+        # Prepare inputs (use class attributes)
+        x_init = self.x_init
+        zs = self.zs
+        ts = self.ts
 
-        sampler = EulerMaruyamaSampler(diffusion_process, False)
+        # Calculate expected output (non-jitted)
+        expected_final_x = sampler.sample(x_init, zs, ts)
 
-        # Create a simple v function that returns a constant velocity
-        def v_fn(x, t):
-            return torch.ones_like(x) * 0.1
+        # JIT the sample method
+        jitted_sample = jax.jit(sampler.sample)
+        actual_final_x = jitted_sample(x_init, zs, ts)
 
-        vector_field = VectorField(v_fn, VectorFieldType.V)
+        assert_allclose(actual_final_x, expected_final_x, atol=1e-5, rtol=1e-5)
 
-        # Create input tensors
-        batch_size = 5
-        data_dim = 3
-        x = torch.randn(batch_size, data_dim)
-        zs = torch.randn(
-            2, batch_size, data_dim
-        )  # L-1 noise tensors (not used in deterministic)
-        idx = 0
-        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    @pytest.mark.parametrize("vf_type", VectorFieldType)
+    def test_sample_trajectory_jit(self, vf_type, use_stochastic):
+        """Test EulerMaruyamaSampler.sample_trajectory under JIT compilation."""
+        simple_vp_process = VariancePreservingProcess()
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, zero_vector_field, vf_type, use_stochastic
+        )
 
-        # Call the method
-        result = sampler.sample_step_deterministic_v(vector_field, x, zs, idx, ts)
+        # Prepare inputs (use class attributes)
+        x_init = self.x_init
+        zs = self.zs
+        ts = self.ts
 
-        # Check shape
-        assert result.shape == x.shape
+        # Calculate expected output (non-jitted)
+        expected_trajectory = sampler.sample_trajectory(x_init, zs, ts)
 
-        # For this test we won't check exact values, as they depend on the complex dynamics
-        # But we can check that the result is different from the input
-        assert not torch.allclose(result, x)
+        # JIT the sample_trajectory method
+        jitted_sample_trajectory = jax.jit(sampler.sample_trajectory)
+        actual_trajectory = jitted_sample_trajectory(x_init, zs, ts)
 
-    def test_stochastic_sampling_methods(self):
-        """Test the stochastic sampling methods."""
-        # Create a mock diffusion process with simple dynamics
-        alpha = lambda t: torch.ones_like(t)  # Constant alpha = 1
-        sigma = lambda t: t  # Linear sigma = t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+        assert_allclose(actual_trajectory, expected_trajectory, atol=1e-5, rtol=1e-5)
 
-        sampler = EulerMaruyamaSampler(diffusion_process, True)
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    @pytest.mark.parametrize("vf_type", VectorFieldType)
+    def test_sample_vmap(self, vf_type, use_stochastic):
+        """Test EulerMaruyamaSampler.sample with VMAP and JIT combinations."""
+        simple_vp_process = VariancePreservingProcess()
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, zero_vector_field, vf_type, use_stochastic
+        )
 
-        # Create simple vector field functions
-        def field_fn(x, t):
-            return torch.zeros_like(x)
+        # Prepare batched inputs
+        batch_size = 3
+        key = jax.random.key(43)
+        key, x0_key, zs_key = jax.random.split(key, 3)
+        batched_x_init = jax.random.normal(x0_key, (batch_size,) + self.data_shape)
+        # Ensure zs has batch dim matching x_init
+        batched_zs = jax.random.normal(
+            zs_key, (batch_size, self.num_steps) + self.data_shape
+        )
+        ts = self.ts  # Timesteps are usually not batched
 
-        score_field = VectorField(field_fn, VectorFieldType.SCORE)
-        x0_field = VectorField(field_fn, VectorFieldType.X0)
-        eps_field = VectorField(field_fn, VectorFieldType.EPS)
-        v_field = VectorField(field_fn, VectorFieldType.V)
+        # 1. Calculate expected output using vmap on non-jitted function
+        vmap_sample_expected = jax.vmap(sampler.sample, in_axes=(0, 0, None))
+        expected_batch_final_x = vmap_sample_expected(batched_x_init, batched_zs, ts)
+        assert expected_batch_final_x.shape == (batch_size,) + self.data_shape
 
-        # Create input tensors
-        batch_size = 5
-        data_dim = 3
-        x = torch.randn(batch_size, data_dim)
-        zs = torch.randn(2, batch_size, data_dim)  # L-1 noise tensors
-        idx = 0
-        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
+        # 2. Vmap only
+        vmap_sample = jax.vmap(sampler.sample, in_axes=(0, 0, None))
+        actual_batch_final_x_vmap = vmap_sample(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_final_x_vmap, expected_batch_final_x, atol=1e-6, rtol=1e-6
+        )
 
-        # Test all stochastic methods
-        result_score = sampler.sample_step_stochastic_score(score_field, x, zs, idx, ts)
-        result_x0 = sampler.sample_step_stochastic_x0(x0_field, x, zs, idx, ts)
-        result_eps = sampler.sample_step_stochastic_eps(eps_field, x, zs, idx, ts)
-        result_v = sampler.sample_step_stochastic_v(v_field, x, zs, idx, ts)
+        # 3. Jit(Vmap)
+        jit_vmap_sample = jax.jit(vmap_sample)
+        actual_batch_final_x_jit_vmap = jit_vmap_sample(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_final_x_jit_vmap, expected_batch_final_x, atol=1e-5, rtol=1e-5
+        )
 
-        # Check shapes
-        assert result_score.shape == x.shape
-        assert result_x0.shape == x.shape
-        assert result_eps.shape == x.shape
-        assert result_v.shape == x.shape
+        # 4. Vmap(Jit)
+        jit_sample = jax.jit(sampler.sample)
+        vmap_jit_sample = jax.vmap(jit_sample, in_axes=(0, 0, None))
+        actual_batch_final_x_vmap_jit = vmap_jit_sample(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_final_x_vmap_jit, expected_batch_final_x, atol=1e-5, rtol=1e-5
+        )
 
-        # For stochastic methods, results should be different due to noise
-        assert not torch.allclose(result_score, x)
-        assert not torch.allclose(result_x0, x)
-        assert not torch.allclose(result_eps, x)
-        assert not torch.allclose(result_v, x)
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    @pytest.mark.parametrize("vf_type", VectorFieldType)
+    def test_sample_trajectory_vmap(self, vf_type, use_stochastic):
+        """Test EulerMaruyamaSampler.sample_trajectory with VMAP and JIT combinations."""
+        simple_vp_process = VariancePreservingProcess()
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
+        sampler = EulerMaruyamaSampler(
+            simple_vp_process, zero_vector_field, vf_type, use_stochastic
+        )
+
+        # Prepare batched inputs
+        batch_size = 3
+        key = jax.random.key(44)
+        key, x0_key, zs_key = jax.random.split(key, 3)
+        batched_x_init = jax.random.normal(x0_key, (batch_size,) + self.data_shape)
+        batched_zs = jax.random.normal(
+            zs_key, (batch_size, self.num_steps) + self.data_shape
+        )
+        ts = self.ts
+        expected_traj_shape = (
+            batch_size,
+            self.num_steps + 1,
+        ) + self.data_shape
+
+        # 1. Calculate expected output using vmap on non-jitted function
+        vmap_traj_expected = jax.vmap(sampler.sample_trajectory, in_axes=(0, 0, None))
+        expected_batch_traj = vmap_traj_expected(batched_x_init, batched_zs, ts)
+        assert expected_batch_traj.shape == expected_traj_shape
+
+        # 2. Vmap only
+        vmap_traj = jax.vmap(sampler.sample_trajectory, in_axes=(0, 0, None))
+        actual_batch_traj_vmap = vmap_traj(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_traj_vmap, expected_batch_traj, atol=1e-6, rtol=1e-6
+        )
+
+        # 3. Jit(Vmap)
+        jit_vmap_traj = jax.jit(vmap_traj)
+        actual_batch_traj_jit_vmap = jit_vmap_traj(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_traj_jit_vmap, expected_batch_traj, atol=1e-5, rtol=1e-5
+        )
+
+        # 4. Vmap(Jit)
+        jit_traj = jax.jit(sampler.sample_trajectory)
+        vmap_jit_traj = jax.vmap(jit_traj, in_axes=(0, 0, None))
+        actual_batch_traj_vmap_jit = vmap_jit_traj(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_traj_vmap_jit, expected_batch_traj, atol=1e-5, rtol=1e-5
+        )
 
 
 class TestDDMSampler:
-    def test_initialization(self):
-        """Test basic initialization of DDMSampler."""
-        # Create a mock diffusion process
-        alpha = lambda t: torch.ones_like(t)
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+    """Tests for the DDMSampler class. Dependencies defined internally."""
 
-        # Initialize sampler
-        is_stochastic = True
-        sampler = DDMSampler(diffusion_process, is_stochastic)
+    # Define common test data as class attributes
+    data_shape = (3,)
+    num_steps = 3
+    key = jax.random.key(123)
+    x_init = jax.random.normal(key, data_shape)  # Shape: (3,)
+    zs = jax.random.normal(key, (num_steps,) + data_shape)  # Shape: (3, 3,)
+    ts = jnp.array([0.99, 0.6, 0.3, 0.0])  # Shape: (4,), Avoid t=1.0 for VP process
+    idx = 0  # Corresponds to t=0.99 -> t1=0.6
 
-        # Check attributes
-        assert sampler.diffusion_process is diffusion_process
-        assert sampler.is_stochastic is is_stochastic
-
-    def test_convert_to_x0(self):
-        """Test the _convert_to_x0 method."""
-        # Create a mock diffusion process
-        alpha = lambda t: 1 - 0.5 * t
-        sigma = lambda t: torch.sqrt(t)
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize sampler
-        sampler = DDMSampler(diffusion_process, True)
-
-        # Create test inputs
-        batch_size = 2
-        data_dim = 3
-        x = torch.randn(batch_size, data_dim)
-        t = torch.tensor([0.5])
-
-        # Test conversion from different vector field types
-
-        # 1. Test SCORE to X0 conversion
-        score = -x  # Score of standard normal
-        x0_from_score = sampler._convert_to_x0(x, t, score, VectorFieldType.SCORE)
-        assert x0_from_score.shape == x.shape
-
-        # 2. Test EPS to X0 conversion
-        eps = torch.randn_like(x)
-        x0_from_eps = sampler._convert_to_x0(x, t, eps, VectorFieldType.EPS)
-        assert x0_from_eps.shape == x.shape
-
-        # 3. Test V to X0 conversion
-        v = torch.randn_like(x)
-        x0_from_v = sampler._convert_to_x0(x, t, v, VectorFieldType.V)
-        assert x0_from_v.shape == x.shape
-
-        # 4. Test X0 to X0 conversion (should be identity)
-        x0 = torch.zeros_like(x)
-        x0_from_x0 = sampler._convert_to_x0(x, t, x0, VectorFieldType.X0)
-        assert x0_from_x0.shape == x.shape
-        assert torch.allclose(x0_from_x0, x0)
-
-    def test_ddpm_step_x0_tensor(self):
-        """Test the _ddpm_step_x0_tensor method."""
-        # Create a mock diffusion process
-        alpha = lambda t: 1 - 0.5 * t
-        sigma = lambda t: torch.sqrt(t)
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize sampler
-        sampler = DDMSampler(diffusion_process, True)
-
-        # Create test inputs
-        batch_size = 2
-        data_dim = 3
-        x = torch.randn(batch_size, data_dim)
-        x0 = torch.zeros_like(x)  # Target is zero
-        zs = torch.randn(2, batch_size, data_dim)
-        idx = 0
-        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
-
-        # Call the method
-        result = sampler._ddpm_step_x0_tensor(x0, x, zs, idx, ts)
-
-        # Check shape
-        assert result.shape == x.shape
-
-    def test_ddim_step_x0_tensor(self):
-        """Test the _ddim_step_x0_tensor method."""
-        # Create a mock diffusion process
-        alpha = lambda t: 1 - 0.5 * t
-        sigma = lambda t: torch.sqrt(t)
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize sampler
-        sampler = DDMSampler(diffusion_process, False)
-
-        # Create test inputs
-        batch_size = 2
-        data_dim = 3
-        x = torch.randn(batch_size, data_dim)
-        x0 = torch.zeros_like(x)  # Target is zero
-        zs = torch.randn(2, batch_size, data_dim)  # Not used in deterministic case
-        idx = 0
-        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
-
-        # Call the method
-        result = sampler._ddim_step_x0_tensor(x0, x, zs, idx, ts)
-
-        # Check shape
-        assert result.shape == x.shape
-
-    def test_sample_step_deterministic_x0(self):
-        """Test the sample_step_deterministic_x0 method."""
-        # Create a mock diffusion process
-        alpha = lambda t: 1 - 0.5 * t
-        sigma = lambda t: torch.sqrt(t)
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize sampler
-        sampler = DDMSampler(diffusion_process, False)
-
-        # Create a simple x0 function that returns zeros
-        def x0_fn(x, t):
-            return torch.zeros_like(x)
-
-        vector_field = VectorField(x0_fn, VectorFieldType.X0)
-
-        # Create input tensors
-        batch_size = 5
-        data_dim = 3
-        x = torch.randn(batch_size, data_dim)
-        zs = torch.randn(2, batch_size, data_dim)  # Not used in deterministic case
-        idx = 0
-        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
-
-        # Call the method
-        result = sampler.sample_step_deterministic_x0(vector_field, x, zs, idx, ts)
-
-        # Check shape
-        assert result.shape == x.shape
-
-    def test_sample_step_stochastic_x0(self):
-        """Test the sample_step_stochastic_x0 method."""
-        # Create a mock diffusion process
-        alpha = lambda t: 1 - 0.5 * t
-        sigma = lambda t: torch.sqrt(t)
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize sampler
-        sampler = DDMSampler(diffusion_process, True)
-
-        # Create a simple x0 function that returns zeros
-        def x0_fn(x, t):
-            return torch.zeros_like(x)
-
-        vector_field = VectorField(x0_fn, VectorFieldType.X0)
-
-        # Create input tensors
-        batch_size = 5
-        data_dim = 3
-        x = torch.randn(batch_size, data_dim)
-        zs = torch.randn(2, batch_size, data_dim)
-        idx = 0
-        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
-
-        # Call the method
-        result = sampler.sample_step_stochastic_x0(vector_field, x, zs, idx, ts)
-
-        # Check shape
-        assert result.shape == x.shape
-
-    def test_other_vector_field_types(self):
-        """Test sampling with other vector field types (SCORE, EPS, V)."""
-        # Create a mock diffusion process
-        alpha = lambda t: 1 - 0.5 * t
-        sigma = lambda t: torch.sqrt(t)
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize samplers
-        deterministic_sampler = DDMSampler(diffusion_process, False)
-        stochastic_sampler = DDMSampler(diffusion_process, True)
-
-        # Create simple vector field functions
-        def field_fn(x, t):
-            return torch.zeros_like(x)
-
-        score_field = VectorField(field_fn, VectorFieldType.SCORE)
-        eps_field = VectorField(field_fn, VectorFieldType.EPS)
-        v_field = VectorField(field_fn, VectorFieldType.V)
-
-        # Create input tensors
-        batch_size = 5
-        data_dim = 3
-        x = torch.randn(batch_size, data_dim)
-        zs = torch.randn(2, batch_size, data_dim)
-        idx = 0
-        ts = torch.tensor([0.8, 0.5, 0.0])  # Decreasing time steps
-
-        # Test deterministic methods
-        det_result_score = deterministic_sampler.sample_step_deterministic_score(
-            score_field, x, zs, idx, ts
-        )
-        det_result_eps = deterministic_sampler.sample_step_deterministic_eps(
-            eps_field, x, zs, idx, ts
-        )
-        det_result_v = deterministic_sampler.sample_step_deterministic_v(
-            v_field, x, zs, idx, ts
-        )
-
-        # Check shapes
-        assert det_result_score.shape == x.shape
-        assert det_result_eps.shape == x.shape
-        assert det_result_v.shape == x.shape
-
-        # Test stochastic methods
-        stoch_result_score = stochastic_sampler.sample_step_stochastic_score(
-            score_field, x, zs, idx, ts
-        )
-        stoch_result_eps = stochastic_sampler.sample_step_stochastic_eps(
-            eps_field, x, zs, idx, ts
-        )
-        stoch_result_v = stochastic_sampler.sample_step_stochastic_v(
-            v_field, x, zs, idx, ts
-        )
-
-        # Check shapes
-        assert stoch_result_score.shape == x.shape
-        assert stoch_result_eps.shape == x.shape
-        assert stoch_result_v.shape == x.shape
-
-    def test_end_to_end_sampling(self):
-        """Test end-to-end sampling with DDMSampler."""
-        # Create a mock diffusion process
-        alpha = lambda t: 1 - 0.5 * t
-        sigma = lambda t: torch.sqrt(t)
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize sampler
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    def test_get_sample_step_function_selection(self, use_stochastic):
+        """Test that the correct internal step function is selected."""
+        simple_vp_process = VariancePreservingProcess()
+        zero_vector_field = lambda x, t: jnp.zeros_like(x)
         sampler = DDMSampler(
-            diffusion_process, False
-        )  # Deterministic for reproducibility
+            diffusion_process=simple_vp_process,
+            vector_field=zero_vector_field,
+            vector_field_type=VectorFieldType.X0,  # Arbitrary for this test
+            use_stochastic_sampler=use_stochastic,
+        )
+        expected_func_name = (
+            f"_sample_step_{'stochastic' if use_stochastic else 'deterministic'}"
+        )
+        expected_func = getattr(sampler, expected_func_name)
+        assert sampler.sample_step == expected_func
 
-        # Create a simple x0 function that returns zeros
-        def x0_fn(x, t):
-            return torch.zeros_like(x)
+    @pytest.mark.parametrize("input_vf_type", VectorFieldType)
+    def test_get_x0_prediction(self, input_vf_type):
+        """Test the conversion of any vector field type to X0 prediction."""
+        simple_vp_process = VariancePreservingProcess()
+        identity_vector_field = lambda x, t: x
+        x = self.x_init
+        t = self.ts[self.idx]  # 0.99
 
-        vector_field = VectorField(x0_fn, VectorFieldType.X0)
+        # Create a dummy vector field output for the specific type
+        # For simplicity, let's assume the field predicts 'x' itself
+        f_x_t = identity_vector_field(x, t)  # Pretend field output is 'x'
 
-        # Create input tensors
+        sampler = DDMSampler(
+            diffusion_process=simple_vp_process,
+            vector_field=lambda _x, _t: f_x_t,  # Use the fixed output
+            vector_field_type=input_vf_type,
+            use_stochastic_sampler=False,  # Doesn't matter for this method
+        )
+
+        # Calculate expected x0 using the standalone conversion function
+        alpha_t = simple_vp_process.alpha(t)
+        sigma_t = simple_vp_process.sigma(t)
+        alpha_prime_t = simple_vp_process.alpha_prime(t)
+        sigma_prime_t = simple_vp_process.sigma_prime(t)
+        expected_x0_x_t = convert_vector_field_type(
+            x,
+            f_x_t,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            input_vf_type,
+            VectorFieldType.X0,
+        )
+
+        actual_x0_x_t = sampler._get_x0_prediction(x, t)
+        assert_allclose(actual_x0_x_t, expected_x0_x_t, atol=1e-6)
+
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    @pytest.mark.parametrize(
+        "input_vf_type",
+        [
+            VectorFieldType.SCORE,
+            VectorFieldType.EPS,
+            VectorFieldType.V,
+            VectorFieldType.X0,
+        ],
+    )
+    def test_step_consistency_across_input_vf_types(
+        self, input_vf_type, use_stochastic
+    ):
+        """Tests that DDPM/DDIM step is consistent regardless of input VF type if underlying x0 is same."""
+        simple_vp_process = VariancePreservingProcess()
+        x = self.x_init
+        t = self.ts[self.idx]
+
+        # Define a ground truth x0 prediction (e.g., x0 = x * 0.5)
+        def predict_x0_true(x_in, t_in):
+            return x_in * 0.5
+
+        x0_true = predict_x0_true(x, t)
+
+        # Get process quantities for conversion
+        alpha_t = simple_vp_process.alpha(t)
+        sigma_t = simple_vp_process.sigma(t)
+        alpha_prime_t = simple_vp_process.alpha_prime(t)
+        sigma_prime_t = simple_vp_process.sigma_prime(t)
+
+        # Calculate the equivalent prediction for the input_vf_type
+        input_pred = convert_vector_field_type(
+            x,
+            x0_true,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            VectorFieldType.X0,
+            input_vf_type,
+        )
+
+        # Sampler using the converted input prediction and its type
+        sampler_input = DDMSampler(
+            diffusion_process=simple_vp_process,
+            vector_field=lambda _x, _t: input_pred,
+            vector_field_type=input_vf_type,
+            use_stochastic_sampler=use_stochastic,
+        )
+
+        # Reference sampler using the ground truth x0 prediction directly
+        sampler_ref = DDMSampler(
+            diffusion_process=simple_vp_process,
+            vector_field=predict_x0_true,
+            vector_field_type=VectorFieldType.X0,
+            use_stochastic_sampler=use_stochastic,
+        )
+
+        # Get the appropriate step function (same for both due to internal conversion)
+        step_func = sampler_input.get_sample_step_function()
+        step_func_ref = sampler_ref.get_sample_step_function()
+        assert step_func.__name__ == step_func_ref.__name__  # Sanity check
+
+        # Calculate the next step using both
+        x_next_input = step_func(self.idx, x, self.zs, self.ts)
+        x_next_ref = step_func_ref(self.idx, x, self.zs, self.ts)
+
+        # Assert results are close
+        assert_allclose(x_next_input, x_next_ref, atol=1e-5, rtol=1e-5)
+
+    def test_sample_step_deterministic(self):
+        """Test the DDIM step."""
+        simple_vp_process = VariancePreservingProcess()
+        identity_vector_field = lambda x, t: x
+        # Use identity field predicting X0 = x for simplicity
+        sampler = DDMSampler(
+            simple_vp_process, identity_vector_field, VectorFieldType.X0, False
+        )
+        x = self.x_init
+        t = self.ts[self.idx]  # 0.99
+        t1 = self.ts[self.idx + 1]  # 0.6
+
+        # Calculate expected x0 (which is just x in this case)
+        x0_x_t = sampler._get_x0_prediction(x, t)
+        assert_allclose(x0_x_t, x, atol=1e-6)  # Verify assumption
+
+        alpha_t = simple_vp_process.alpha(t)
+        sigma_t = simple_vp_process.sigma(t)
+        alpha_t1 = simple_vp_process.alpha(t1)
+        sigma_t1 = simple_vp_process.sigma(t1)
+
+        # Use the actual alpha_t, sigma_t for t=0.99
+        r01 = sigma_t1 / sigma_t
+        # Avoid division by zero if alpha_t1 is zero (e.g. if t1=1.0)
+        r11 = (alpha_t / alpha_t1) * r01 if alpha_t1 != 0 else 0.0
+        expected_x_next = r01 * x + alpha_t1 * (1 - r11) * x0_x_t
+
+        actual_x_next = sampler._sample_step_deterministic(
+            self.idx, x, self.zs, self.ts
+        )
+        assert_allclose(actual_x_next, expected_x_next, atol=1e-6)
+
+    def test_sample_step_stochastic(self):
+        """Test the DDPM step."""
+        simple_vp_process = VariancePreservingProcess()
+        identity_vector_field = lambda x, t: x
+        # Use identity field predicting X0 = x for simplicity
+        sampler = DDMSampler(
+            simple_vp_process, identity_vector_field, VectorFieldType.X0, True
+        )
+        x = self.x_init
+        t = self.ts[self.idx]  # 0.99
+        t1 = self.ts[self.idx + 1]  # 0.6
+        z_t = self.zs[self.idx]
+
+        x0_x_t = sampler._get_x0_prediction(x, t)
+        assert_allclose(x0_x_t, x, atol=1e-6)  # Verify assumption
+
+        alpha_t = simple_vp_process.alpha(t)
+        sigma_t = simple_vp_process.sigma(t)
+        alpha_t1 = simple_vp_process.alpha(t1)
+        sigma_t1 = simple_vp_process.sigma(t1)
+
+        # Use the actual alpha_t, sigma_t for t=0.99
+        # Avoid division by zero if alpha_t1 or sigma_t is zero
+        r11 = (
+            (alpha_t / alpha_t1) * (sigma_t1 / sigma_t)
+            if alpha_t1 != 0 and sigma_t != 0
+            else 0.0
+        )
+        r12 = r11 * (sigma_t1 / sigma_t) if sigma_t != 0 else 0.0
+        r22 = (alpha_t / alpha_t1) * r12 if alpha_t1 != 0 else 0.0
+
+        expected_mean = r12 * x + alpha_t1 * (1 - r22) * x0_x_t
+        # Clamp value inside sqrt to avoid potential small negative numbers due to precision
+        variance_term = jnp.maximum(1 - (r11**2), 0.0)
+        expected_std = sigma_t1 * jnp.sqrt(variance_term)
+        expected_x_next = expected_mean + expected_std * z_t
+
+        actual_x_next = sampler._sample_step_stochastic(self.idx, x, self.zs, self.ts)
+        assert_allclose(actual_x_next, expected_x_next, atol=1e-6)
+
+    # --- JIT / VMAP Tests ---
+
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    @pytest.mark.parametrize("input_vf_type", VectorFieldType)
+    def test_sample_jit(self, input_vf_type, use_stochastic):
+        """Test DDMSampler.sample under JIT compilation."""
+        simple_vp_process = VariancePreservingProcess()
+
+        # Use a field predicting x0 = x * 0.5
+        def predict_x0(x, t):
+            return x * 0.5
+
+        # Convert this to the input_vf_type prediction dynamically
+        def get_input_pred_field(x, t):
+            x0_true = predict_x0(x, t)
+            alpha_t = simple_vp_process.alpha(t)
+            sigma_t = simple_vp_process.sigma(t)
+            alpha_prime_t = simple_vp_process.alpha_prime(t)
+            sigma_prime_t = simple_vp_process.sigma_prime(t)
+            return convert_vector_field_type(
+                x,
+                x0_true,
+                alpha_t,
+                sigma_t,
+                alpha_prime_t,
+                sigma_prime_t,
+                VectorFieldType.X0,
+                input_vf_type,
+            )
+
+        sampler = DDMSampler(
+            simple_vp_process, get_input_pred_field, input_vf_type, use_stochastic
+        )
+
+        # Prepare inputs (use class attributes)
+        x_init = self.x_init
+        zs = self.zs
+        ts = self.ts
+
+        # Calculate expected output (non-jitted)
+        expected_final_x = sampler.sample(x_init, zs, ts)
+
+        # JIT the sample method
+        jitted_sample = jax.jit(sampler.sample)
+        actual_final_x = jitted_sample(x_init, zs, ts)
+
+        assert_allclose(actual_final_x, expected_final_x, atol=1e-5, rtol=1e-5)
+
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    @pytest.mark.parametrize("input_vf_type", VectorFieldType)
+    def test_sample_trajectory_jit(self, input_vf_type, use_stochastic):
+        """Test DDMSampler.sample_trajectory under JIT compilation."""
+        simple_vp_process = VariancePreservingProcess()
+
+        def predict_x0(x, t):
+            return x * 0.5
+
+        def get_input_pred_field(x, t):
+            x0_true = predict_x0(x, t)
+            alpha_t = simple_vp_process.alpha(t)
+            sigma_t = simple_vp_process.sigma(t)
+            alpha_prime_t = simple_vp_process.alpha_prime(t)
+            sigma_prime_t = simple_vp_process.sigma_prime(t)
+            return convert_vector_field_type(
+                x,
+                x0_true,
+                alpha_t,
+                sigma_t,
+                alpha_prime_t,
+                sigma_prime_t,
+                VectorFieldType.X0,
+                input_vf_type,
+            )
+
+        sampler = DDMSampler(
+            simple_vp_process, get_input_pred_field, input_vf_type, use_stochastic
+        )
+
+        x_init = self.x_init
+        zs = self.zs
+        ts = self.ts
+
+        expected_trajectory = sampler.sample_trajectory(x_init, zs, ts)
+
+        jitted_sample_trajectory = jax.jit(sampler.sample_trajectory)
+        actual_trajectory = jitted_sample_trajectory(x_init, zs, ts)
+
+        assert_allclose(actual_trajectory, expected_trajectory, atol=1e-5, rtol=1e-5)
+
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    @pytest.mark.parametrize("input_vf_type", VectorFieldType)
+    def test_sample_vmap(self, input_vf_type, use_stochastic):
+        """Test DDMSampler.sample with VMAP and JIT combinations."""
+        simple_vp_process = VariancePreservingProcess()
+        # Use a simple field predicting x0=zeros for easier batch testing
+        lambda x, t: jnp.zeros_like(x)
+
+        # Convert to the required input type
+        def get_zero_pred_field(x, t):
+            alpha_t = simple_vp_process.alpha(t)
+            sigma_t = simple_vp_process.sigma(t)
+            alpha_prime_t = simple_vp_process.alpha_prime(t)
+            sigma_prime_t = simple_vp_process.sigma_prime(t)
+            return convert_vector_field_type(
+                x,
+                jnp.zeros_like(x),
+                alpha_t,
+                sigma_t,
+                alpha_prime_t,
+                sigma_prime_t,
+                VectorFieldType.X0,
+                input_vf_type,
+            )
+
+        sampler = DDMSampler(
+            simple_vp_process, get_zero_pred_field, input_vf_type, use_stochastic
+        )
+
+        # Prepare batched inputs
         batch_size = 3
-        data_dim = 2
-        x_t = torch.randn(batch_size, data_dim)  # Initial noisy samples
-        num_steps = 5
-        zs = torch.randn(num_steps - 1, batch_size, data_dim)  # Noise for each step
-        ts = torch.linspace(1.0, 0.0, num_steps)  # Time steps from t=1 to t=0
+        key = jax.random.key(124)
+        key, x0_key, zs_key = jax.random.split(key, 3)
+        batched_x_init = jax.random.normal(x0_key, (batch_size,) + self.data_shape)
+        batched_zs = jax.random.normal(
+            zs_key, (batch_size, self.num_steps) + self.data_shape
+        )
+        ts = self.ts
 
-        # Sample
-        result = sampler.sample(vector_field, x_t, zs, ts)
+        sample_fn = sampler.sample
 
-        # Check shape
-        assert result.shape == (batch_size, data_dim)
+        # 1. Calculate expected output using vmap on non-jitted partial function
+        vmap_sample_expected = jax.vmap(sample_fn, in_axes=(0, 0, None))
+        expected_batch_final_x = vmap_sample_expected(batched_x_init, batched_zs, ts)
+        assert expected_batch_final_x.shape == (batch_size,) + self.data_shape
 
-        # Sample trajectory
-        trajectory = sampler.sample_trajectory(vector_field, x_t, zs, ts)
+        # 2. Vmap only
+        vmap_sample = jax.vmap(sample_fn, in_axes=(0, 0, None))
+        actual_batch_final_x_vmap = vmap_sample(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_final_x_vmap, expected_batch_final_x, atol=1e-6, rtol=1e-6
+        )
 
-        # Check shape
-        assert trajectory.shape == (num_steps, batch_size, data_dim)
-        assert torch.allclose(trajectory[0], x_t)  # First point should be x_t
-        assert torch.allclose(
-            trajectory[-1], result
-        )  # Last point should be the final sample
+        # 3. Jit(Vmap)
+        jit_vmap_sample = jax.jit(vmap_sample)
+        actual_batch_final_x_jit_vmap = jit_vmap_sample(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_final_x_jit_vmap, expected_batch_final_x, atol=1e-5, rtol=1e-5
+        )
+
+        # 4. Vmap(Jit)
+        jit_sample = jax.jit(sample_fn)
+        vmap_jit_sample = jax.vmap(jit_sample, in_axes=(0, 0, None))
+        actual_batch_final_x_vmap_jit = vmap_jit_sample(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_final_x_vmap_jit, expected_batch_final_x, atol=1e-5, rtol=1e-5
+        )
+
+    @pytest.mark.parametrize("use_stochastic", [False, True])
+    @pytest.mark.parametrize("input_vf_type", VectorFieldType)
+    def test_sample_trajectory_vmap(self, input_vf_type, use_stochastic):
+        """Test DDMSampler.sample_trajectory with VMAP and JIT combinations."""
+        simple_vp_process = VariancePreservingProcess()
+        lambda x, t: jnp.zeros_like(x)
+
+        def get_zero_pred_field(x, t):
+            alpha_t = simple_vp_process.alpha(t)
+            sigma_t = simple_vp_process.sigma(t)
+            alpha_prime_t = simple_vp_process.alpha_prime(t)
+            sigma_prime_t = simple_vp_process.sigma_prime(t)
+            return convert_vector_field_type(
+                x,
+                jnp.zeros_like(x),
+                alpha_t,
+                sigma_t,
+                alpha_prime_t,
+                sigma_prime_t,
+                VectorFieldType.X0,
+                input_vf_type,
+            )
+
+        sampler = DDMSampler(
+            simple_vp_process, get_zero_pred_field, input_vf_type, use_stochastic
+        )
+
+        batch_size = 3
+        key = jax.random.key(125)
+        key, x0_key, zs_key = jax.random.split(key, 3)
+        batched_x_init = jax.random.normal(x0_key, (batch_size,) + self.data_shape)
+        batched_zs = jax.random.normal(
+            zs_key, (batch_size, self.num_steps) + self.data_shape
+        )
+        ts = self.ts
+        expected_traj_shape = (
+            batch_size,
+            self.num_steps + 1,
+        ) + self.data_shape
+
+        traj_fn = sampler.sample_trajectory
+
+        # 1. Expected
+        vmap_traj_expected = jax.vmap(traj_fn, in_axes=(0, 0, None))
+        expected_batch_traj = vmap_traj_expected(batched_x_init, batched_zs, ts)
+        assert expected_batch_traj.shape == expected_traj_shape
+
+        # 2. Vmap only
+        vmap_traj = jax.vmap(traj_fn, in_axes=(0, 0, None))
+        actual_batch_traj_vmap = vmap_traj(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_traj_vmap, expected_batch_traj, atol=1e-6, rtol=1e-6
+        )
+
+        # 3. Jit(Vmap)
+        jit_vmap_traj = jax.jit(vmap_traj)
+        actual_batch_traj_jit_vmap = jit_vmap_traj(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_traj_jit_vmap, expected_batch_traj, atol=1e-5, rtol=1e-5
+        )
+
+        # 4. Vmap(Jit)
+        jit_traj = jax.jit(traj_fn)
+        vmap_jit_traj = jax.vmap(jit_traj, in_axes=(0, 0, None))
+        actual_batch_traj_vmap_jit = vmap_jit_traj(batched_x_init, batched_zs, ts)
+        assert_allclose(
+            actual_batch_traj_vmap_jit, expected_batch_traj, atol=1e-5, rtol=1e-5
+        )
+
+
+# Consider adding tests with VE/FM processes as well for broader coverage
+# Consider adding tests where vector_field is not identity/zero if conversions are complex

@@ -4,13 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "diffusionlab"
-version = "2.0.5"
-description = "Easy no-frills Pytorch implementations of common abstractions for diffusion models."
+version = "3.0.0"
+description = "Easy no-frills implementations of common abstractions for diffusion models."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "lightning>=2.5.0.post0",
-    "torch>=2.5.1",
+    "jax>=0.5.3",
 ]
 
 [project.optional-dependencies]
@@ -31,4 +30,6 @@ dev = [
 packages = ["src/diffusionlab"]
 
 [tool.ruff.lint]
-ignore = ["E731"]  # This is the rule which prevents use of lambda expressions
+ignore = [
+    "E731",  # This is the rule which prevents use of lambda expressions
+]
