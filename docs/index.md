@@ -19,7 +19,7 @@
 <div>
   <p><strong>DiffusionLab IS:</strong></p>
   <ul>
-    <li>A lightweight and flexible set of PyTorch APIs for smaller-scale diffusion model training and sampling.</li>
+    <li>A lightweight and flexible set of Jax APIs for smaller-scale diffusion model training and sampling.</li>
     <li>An implementation of the mathematical foundations of diffusion models.</li>
   </ul>
   
