@@ -13,7 +13,7 @@
 
 TL;DR: DiffusionLab is a laboratory for quickly and easily experimenting with diffusion models.
 - DiffusionLab IS:
-  - A lightweight and flexible set of PyTorch APIs for smaller-scale diffusion model training and sampling.
+  - A lightweight and flexible set of Jax APIs for smaller-scale diffusion model training and sampling.
   - An implementation of the mathematical foundations of diffusion models. 
 - DiffusionLab IS NOT:
   - A replacement for HuggingFace Diffusers. 
