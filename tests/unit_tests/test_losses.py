@@ -1,584 +1,335 @@
-import torch
-import pytest
-from diffusionlab.losses import SamplewiseDiffusionLoss
-from diffusionlab.diffusions import DiffusionProcess
-from diffusionlab.vector_fields import VectorFieldType, VectorField
-from diffusionlab.utils import pad_shape_back
-
-
-class TestSamplewiseDiffusionLoss:
-    """Tests for the SamplewiseDiffusionLoss class."""
-
-    def test_initialization_with_x0_target(self):
-        """Test initialization with X0 target type."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with X0 target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.X0)
-
-        # Check attributes
-        assert loss_fn.diffusion_process is diffusion_process
-        assert loss_fn.target_type == VectorFieldType.X0
-        assert callable(loss_fn.target)
-
-        # Test target function
-        batch_size = 4
-        channels = 3
-        height = width = 8
-
-        x_t = torch.randn(batch_size, channels, height, width)
-        f_x_t = torch.randn(batch_size, channels, height, width)
-        x_0 = torch.randn(batch_size, channels, height, width)
-        eps = torch.randn(batch_size, channels, height, width)
-        t = torch.rand(batch_size)
-
-        # For X0 target type, target should be x_0
-        target = loss_fn.target(x_t, f_x_t, x_0, eps, t)
-        assert torch.allclose(target, x_0)
-
-    def test_initialization_with_eps_target(self):
-        """Test initialization with EPS target type."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with EPS target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.EPS)
-
-        # Check attributes
-        assert loss_fn.diffusion_process is diffusion_process
-        assert loss_fn.target_type == VectorFieldType.EPS
-        assert callable(loss_fn.target)
-
-        # Test target function
-        batch_size = 4
-        channels = 3
-        height = width = 8
-
-        x_t = torch.randn(batch_size, channels, height, width)
-        f_x_t = torch.randn(batch_size, channels, height, width)
-        x_0 = torch.randn(batch_size, channels, height, width)
-        eps = torch.randn(batch_size, channels, height, width)
-        t = torch.rand(batch_size)
-
-        # For EPS target type, target should be eps
-        target = loss_fn.target(x_t, f_x_t, x_0, eps, t)
-        assert torch.allclose(target, eps)
-
-    def test_initialization_with_v_target(self):
-        """Test initialization with V target type."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with V target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.V)
-
-        # Check attributes
-        assert loss_fn.diffusion_process is diffusion_process
-        assert loss_fn.target_type == VectorFieldType.V
-        assert callable(loss_fn.target)
-
-        # Test target function
-        batch_size = 4
-        channels = 3
-        height = width = 8
-
-        x_t = torch.randn(batch_size, channels, height, width)
-        f_x_t = torch.randn(batch_size, channels, height, width)
-        x_0 = torch.randn(batch_size, channels, height, width)
-        eps = torch.randn(batch_size, channels, height, width)
-        t = torch.rand(batch_size)
-
-        # For V target type, target should be calculated using alpha_prime and sigma_prime
-        expected_target = (
-            pad_shape_back(diffusion_process.alpha_prime(t), x_0.shape) * x_0
-            + pad_shape_back(diffusion_process.sigma_prime(t), x_0.shape) * eps
-        )
-
-        target = loss_fn.target(x_t, f_x_t, x_0, eps, t)
-        assert torch.allclose(target, expected_target)
-
-    def test_initialization_with_score_target(self):
-        """Test that initialization with SCORE target type raises ValueError."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with SCORE target type should raise ValueError
-        with pytest.raises(ValueError):
-            SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.SCORE)
-
-    def test_forward_with_x0_target(self):
-        """Test forward method with X0 target type."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with X0 target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.X0)
-
-        # Create test data
-        batch_size = 4
-        channels = 3
-        height = width = 8
-
-        x_t = torch.randn(batch_size, channels, height, width)
-        f_x_t = torch.randn(batch_size, channels, height, width)
-        x_0 = torch.randn(batch_size, channels, height, width)
-        eps = torch.randn(batch_size, channels, height, width)
-        t = torch.rand(batch_size)
-
-        # Compute loss
-        loss = loss_fn(x_t, f_x_t, x_0, eps, t)
-
-        # Check shape
-        assert loss.shape == (batch_size,), (
-            "Loss should return batch-wise scalar values"
-        )
-
-        # Check values - for X0 target, loss should be MSE between f_x_t and x_0
-        expected_loss = torch.sum((f_x_t - x_0) ** 2, dim=(1, 2, 3))
-        assert torch.allclose(loss, expected_loss)
-
-    def test_forward_with_eps_target(self):
-        """Test forward method with EPS target type."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with EPS target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.EPS)
-
-        # Create test data
-        batch_size = 4
-        channels = 3
-        height = width = 8
-
-        x_t = torch.randn(batch_size, channels, height, width)
-        f_x_t = torch.randn(batch_size, channels, height, width)
-        x_0 = torch.randn(batch_size, channels, height, width)
-        eps = torch.randn(batch_size, channels, height, width)
-        t = torch.rand(batch_size)
-
-        # Compute loss
-        loss = loss_fn(x_t, f_x_t, x_0, eps, t)
-
-        # Check shape
-        assert loss.shape == (batch_size,), (
-            "Loss should return batch-wise scalar values"
-        )
-
-        # Check values - for EPS target, loss should be MSE between f_x_t and eps
-        expected_loss = torch.sum((f_x_t - eps) ** 2, dim=(1, 2, 3))
-        assert torch.allclose(loss, expected_loss)
-
-    def test_forward_with_v_target(self):
-        """Test forward method with V target type."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with V target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.V)
-
-        # Create test data
-        batch_size = 4
-        channels = 3
-        height = width = 8
-
-        x_t = torch.randn(batch_size, channels, height, width)
-        f_x_t = torch.randn(batch_size, channels, height, width)
-        x_0 = torch.randn(batch_size, channels, height, width)
-        eps = torch.randn(batch_size, channels, height, width)
-        t = torch.rand(batch_size)
-
-        # Compute expected target
-        expected_target = (
-            pad_shape_back(diffusion_process.alpha_prime(t), x_0.shape) * x_0
-            + pad_shape_back(diffusion_process.sigma_prime(t), x_0.shape) * eps
-        )
-
-        # Compute loss
-        loss = loss_fn(x_t, f_x_t, x_0, eps, t)
-
-        # Check shape
-        assert loss.shape == (batch_size,), (
-            "Loss should return batch-wise scalar values"
-        )
-
-        # Check values - for V target, loss should be MSE between f_x_t and expected_target
-        expected_loss = torch.sum((f_x_t - expected_target) ** 2, dim=(1, 2, 3))
-        assert torch.allclose(loss, expected_loss)
-
-    def test_with_1d_data(self):
-        """Test loss computation with 1D data."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with X0 target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.X0)
-
-        # Create 1D test data
-        batch_size = 4
-        data_dim = 10
-
-        x_t = torch.randn(batch_size, data_dim)
-        f_x_t = torch.randn(batch_size, data_dim)
-        x_0 = torch.randn(batch_size, data_dim)
-        eps = torch.randn(batch_size, data_dim)
-        t = torch.rand(batch_size)
-
-        # Compute loss
-        loss = loss_fn(x_t, f_x_t, x_0, eps, t)
-
-        # Check shape
-        assert loss.shape == (batch_size,), (
-            "Loss should return batch-wise scalar values"
-        )
-
-        # Check values
-        expected_loss = torch.sum((f_x_t - x_0) ** 2, dim=1)
-        assert torch.allclose(loss, expected_loss)
-
-    def test_with_3d_data(self):
-        """Test loss computation with 3D data."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with X0 target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.X0)
-
-        # Create 3D test data
-        batch_size = 4
-        depth = 5
-        height = 6
-        width = 7
-
-        x_t = torch.randn(batch_size, depth, height, width)
-        f_x_t = torch.randn(batch_size, depth, height, width)
-        x_0 = torch.randn(batch_size, depth, height, width)
-        eps = torch.randn(batch_size, depth, height, width)
-        t = torch.rand(batch_size)
-
-        # Compute loss
-        loss = loss_fn(x_t, f_x_t, x_0, eps, t)
-
-        # Check shape
-        assert loss.shape == (batch_size,), (
-            "Loss should return batch-wise scalar values"
-        )
-
-        # Check values
-        expected_loss = torch.sum((f_x_t - x_0) ** 2, dim=(1, 2, 3))
-        assert torch.allclose(loss, expected_loss)
-
-    def test_with_custom_diffusion(self):
-        """Test loss computation with a custom diffusion process."""
-        # Create a custom diffusion process with non-trivial alpha_prime and sigma_prime
-        alpha = lambda t: torch.cos(t * torch.pi / 2)
-        sigma = lambda t: torch.sin(t * torch.pi / 2)
-
-        # For this alpha and sigma, the derivatives are:
-        alpha_prime = lambda t: -torch.pi / 2 * torch.sin(t * torch.pi / 2)
-        sigma_prime = lambda t: torch.pi / 2 * torch.cos(t * torch.pi / 2)
-
-        class CustomDiffusionProcess(DiffusionProcess):
-            def __init__(self):
-                super().__init__(alpha=alpha, sigma=sigma)
-                # Override the automatically computed derivatives with our analytical ones
-                self.alpha_prime = alpha_prime
-                self.sigma_prime = sigma_prime
-
-        diffusion_process = CustomDiffusionProcess()
-
-        # Initialize loss with V target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.V)
-
-        # Create test data
-        batch_size = 4
-        channels = 3
-        height = width = 8
-
-        x_t = torch.randn(batch_size, channels, height, width)
-        f_x_t = torch.randn(batch_size, channels, height, width)
-        x_0 = torch.randn(batch_size, channels, height, width)
-        eps = torch.randn(batch_size, channels, height, width)
-        t = torch.rand(batch_size)
-
-        # Compute expected target
-        expected_target = (
-            pad_shape_back(diffusion_process.alpha_prime(t), x_0.shape) * x_0
-            + pad_shape_back(diffusion_process.sigma_prime(t), x_0.shape) * eps
-        )
-
-        # Compute loss
-        loss = loss_fn(x_t, f_x_t, x_0, eps, t)
-
-        # Check shape
-        assert loss.shape == (batch_size,), (
-            "Loss should return batch-wise scalar values"
-        )
-
-        # Check values
-        expected_loss = torch.sum((f_x_t - expected_target) ** 2, dim=(1, 2, 3))
-        assert torch.allclose(loss, expected_loss)
-
-    # New tests for batchwise_loss_factory
-    def test_batchwise_loss_factory_creation(self):
-        """Test that batchwise_loss_factory returns a callable function."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with X0 target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.X0)
-
-        # Create batchwise loss function with different noise draws
-        batchwise_loss_1 = loss_fn.batchwise_loss_factory(N_noise_draws_per_sample=1)
-        batchwise_loss_3 = loss_fn.batchwise_loss_factory(N_noise_draws_per_sample=3)
-
-        # Verify that returned objects are callable
-        assert callable(batchwise_loss_1)
-        assert callable(batchwise_loss_3)
-
-    def test_batchwise_loss_with_simple_vector_field(self):
-        """Test batchwise_loss_factory with a simple vector field."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with X0 target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.X0)
-
-        # Create a simple vector field that returns the input unchanged
-        class IdentityVectorField(VectorField):
-            def __init__(self):
-                # Define the function to pass to the parent class
-                def identity_fn(x, t):
-                    return x
-
-                super().__init__(identity_fn, VectorFieldType.X0)
-
-        # Create test data
-        batch_size = 4
-        channels = 3
-        height = width = 8
-
-        # Create clean input data, timesteps, and sample weights
-        x_0 = torch.randn(batch_size, channels, height, width)
-        t = torch.rand(batch_size)
-        sample_weights = torch.ones(batch_size)
-
-        # Create vector field
-        vector_field = IdentityVectorField()
-
-        # Create batchwise loss function with 1 noise draw per sample
-        batchwise_loss = loss_fn.batchwise_loss_factory(N_noise_draws_per_sample=1)
-
-        # Compute loss
-        loss = batchwise_loss(vector_field, x_0, t, sample_weights)
-
-        # Verify that the result is a scalar tensor
-        assert loss.dim() == 0, "Loss should be a scalar tensor"
-
-    def test_batchwise_loss_multiple_noise_draws(self):
-        """Test batchwise_loss_factory with multiple noise draws per sample."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with EPS target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.EPS)
-
-        # Create a vector field that always returns zeros
-        class ZeroVectorField(VectorField):
-            def __init__(self):
-                # Define the function to pass to the parent class
-                def zero_fn(x, t):
-                    return torch.zeros_like(x)
-
-                super().__init__(zero_fn, VectorFieldType.EPS)
-
-        # Create test data
-        batch_size = 4
-        data_dim = 10
-
-        # Create clean input data, timesteps, and sample weights
-        x_0 = torch.randn(batch_size, data_dim)
-        t = torch.rand(batch_size)
-        sample_weights = torch.ones(batch_size)
-
-        # Create vector field
-        vector_field = ZeroVectorField()
-
-        # Verify that increasing noise draws doesn't change the result format
-        for noise_draws in [1, 3, 5]:
-            batchwise_loss = loss_fn.batchwise_loss_factory(
-                N_noise_draws_per_sample=noise_draws
+import jax
+import jax.numpy as jnp
+from numpy.testing import assert_allclose
+import pytest  # Using pytest as per rules
+
+from diffusionlab.losses import DiffusionLoss, VectorFieldType
+from diffusionlab.dynamics import (
+    DiffusionProcess,
+    VariancePreservingProcess,
+    FlowMatchingProcess,
+    VarianceExplodingProcess,
+)
+
+
+class TestDiffusionLoss:
+    """Tests for the DiffusionLoss class."""
+
+    @pytest.fixture(
+        params=[
+            VariancePreservingProcess(),
+            FlowMatchingProcess(),
+            VarianceExplodingProcess(sigma=lambda t: t),
+        ]
+    )
+    def process(self, request):
+        """Provides different DiffusionProcess instances for testing."""
+        return request.param
+
+    @pytest.mark.parametrize(
+        "vector_field_type",
+        [VectorFieldType.X0, VectorFieldType.EPS, VectorFieldType.V],
+    )
+    def test_init_target_functions(
+        self, process: DiffusionProcess, vector_field_type: VectorFieldType
+    ):
+        """Test that the correct target function is set during init."""
+        loss_instance = DiffusionLoss(process, vector_field_type, 1)
+        key = jax.random.key(0)
+        key, x0_key, eps_key = jax.random.split(key, 3)
+        x_0 = jax.random.normal(x0_key, (3,))  # (data_dim,)
+        eps = jax.random.normal(eps_key, (3,))  # (data_dim,)
+        t = jnp.array(0.4)  # scalar
+        x_t = process.forward(x_0, t, eps)  # (data_dim,)
+        f_x_t = jnp.zeros_like(x_t)  # Dummy prediction (data_dim,)
+
+        target = loss_instance.target(x_t, f_x_t, x_0, eps, t)
+
+        if vector_field_type == VectorFieldType.X0:
+            expected_target = x_0
+        elif vector_field_type == VectorFieldType.EPS:
+            expected_target = eps
+        elif vector_field_type == VectorFieldType.V:
+            expected_target = (
+                process.alpha_prime(t) * x_0 + process.sigma_prime(t) * eps
             )
-            loss = batchwise_loss(vector_field, x_0, t, sample_weights)
+        else:
+            pytest.fail(f"Unexpected vector_field_type: {vector_field_type}")
 
-            # Verify that the result is a scalar tensor
-            assert loss.dim() == 0, (
-                f"Loss should be a scalar tensor with {noise_draws} noise draws"
+        assert_allclose(target, expected_target, atol=1e-6)
+
+    def test_init_raises_for_score(self, process: DiffusionProcess):
+        """Test that initializing with SCORE target type raises ValueError."""
+        with pytest.raises(ValueError, match="Direct score matching is not supported"):
+            DiffusionLoss(process, VectorFieldType.SCORE, 1)
+
+    def test_init_raises_for_undefined_enum(self, process: DiffusionProcess):
+        """Test that initializing with undefined type raises ValueError."""
+        # Use an invalid string which will fail the enum lookup
+        with pytest.raises(ValueError, match="Invalid target type"):
+            DiffusionLoss(process, "invalid_type", 1)  # type: ignore
+
+    @pytest.mark.parametrize(
+        "vector_field_type",
+        [VectorFieldType.X0, VectorFieldType.EPS, VectorFieldType.V],
+    )
+    def test_prediction_loss(
+        self, process: DiffusionProcess, vector_field_type: VectorFieldType
+    ):
+        """Test prediction_loss with different targets."""
+        loss_instance = DiffusionLoss(process, vector_field_type, 1)
+        key = jax.random.key(
+            vector_field_type.value
+        )  # Use enum value for different key per type
+        key, x0_key, eps_key, fx_key = jax.random.split(key, 4)
+        x_0 = jax.random.normal(x0_key, (3,))  # (data_dim,)
+        eps = jax.random.normal(eps_key, (3,))  # (data_dim,)
+        t = jnp.array(0.4)  # scalar
+        x_t = process.forward(x_0, t, eps)  # (data_dim,)
+        f_x_t = jax.random.normal(fx_key, (3,))  # Dummy prediction (data_dim,)
+
+        if vector_field_type == VectorFieldType.X0:
+            target = x_0
+        elif vector_field_type == VectorFieldType.EPS:
+            target = eps
+        elif vector_field_type == VectorFieldType.V:
+            target = process.alpha_prime(t) * x_0 + process.sigma_prime(t) * eps
+        else:
+            pytest.fail(f"Unexpected vector_field_type: {vector_field_type}")
+
+        expected_loss = jnp.sum((f_x_t - target) ** 2)
+        actual_loss = loss_instance.prediction_loss(x_t, f_x_t, x_0, eps, t)
+        assert_allclose(actual_loss, expected_loss, atol=1e-6)
+
+    @pytest.mark.parametrize(
+        "vector_field_type",
+        [VectorFieldType.X0, VectorFieldType.EPS, VectorFieldType.V],
+    )
+    def test_call_single_noise_draw(
+        self, process: DiffusionProcess, vector_field_type: VectorFieldType
+    ):
+        """Test __call__ with num_noise_draws_per_sample=1."""
+        loss_instance = DiffusionLoss(process, vector_field_type, 1)
+        key = jax.random.key(4 + vector_field_type.value)  # Different key per type
+        key, x0_key, call_key = jax.random.split(key, 3)
+        x_0 = jax.random.normal(x0_key, (3,))  # (data_dim,)
+        t = jnp.array(0.7)  # scalar
+
+        # Define a simple vector field model
+        def dummy_vector_field(xt, time):
+            # Example: predict zeros
+            return jnp.zeros_like(xt)
+
+        # Generate the single noise sample that __call__ will use internally
+        eps_single = jax.random.normal(call_key, x_0.shape)  # (data_dim,)
+        x_t_single = process.forward(x_0, t, eps_single)  # (data_dim,)
+        f_x_t_single = dummy_vector_field(x_t_single, t)  # (data_dim,)
+
+        # Calculate expected loss using the internal prediction_loss method
+        expected_loss = loss_instance.prediction_loss(
+            x_t_single, f_x_t_single, x_0, eps_single, t
+        )
+        actual_loss = loss_instance(call_key, dummy_vector_field, x_0, t)
+        assert_allclose(actual_loss, expected_loss, atol=1e-6)
+
+    @pytest.mark.parametrize(
+        "vector_field_type",
+        [VectorFieldType.X0, VectorFieldType.EPS, VectorFieldType.V],
+    )
+    def test_call_multiple_noise_draws(
+        self, process: DiffusionProcess, vector_field_type: VectorFieldType
+    ):
+        """Test __call__ with num_noise_draws_per_sample > 1."""
+        num_draws = 5
+        loss_instance = DiffusionLoss(process, vector_field_type, num_draws)
+        key = jax.random.key(6 + vector_field_type.value)  # Different key per type
+        # Use a batch dim in x_0
+        batch_size = 2
+        data_dim = 3
+        key, x0_key, call_key = jax.random.split(key, 3)
+        x_0 = jax.random.normal(x0_key, (batch_size, data_dim))  # (batch, data_dim)
+        t = jnp.array(0.2)  # scalar, applied to all batch elements
+
+        # Vector field that predicts zeros (must handle batch dims potentially added by noise draws)
+        def zero_vector_field(xt_maybe_batch, t_maybe_batch):
+            return jnp.zeros_like(xt_maybe_batch)
+
+        # --- Manually calculate expected average loss over noise draws ---
+        # Replicate the batching and noise generation inside __call__
+        # x_0 is expanded along axis 0, t is broadcasted
+        x_0_expanded = x_0[None, ...].repeat(
+            num_draws, axis=0
+        )  # (num_draws, batch, data_dim)
+        t_expanded = t[None].repeat(num_draws, axis=0)  # (num_draws,)
+        eps_batch = jax.random.normal(
+            call_key, x_0_expanded.shape
+        )  # (num_draws, batch, data_dim)
+
+        # Vmap forward over the noise draw dimension
+        batch_diffusion_forward = jax.vmap(
+            process.forward, in_axes=(0, 0, 0)
+        )  # Expects (N, *data), (N,), (N, *data) -> (N, *data)
+        # We need to vmap over noise draws, but apply the same t to each sample in the original batch dim of x_0
+        # So, we vmap x_0_expanded (draws, batch, data), t_expanded (draws,), eps_batch (draws, batch, data)
+        x_t_batch = batch_diffusion_forward(
+            x_0_expanded, t_expanded, eps_batch
+        )  # (num_draws, batch, data_dim)
+
+        # The vector field gets the time input potentially batched by num_draws
+        f_x_t_batch = zero_vector_field(
+            x_t_batch, t_expanded[:, None]
+        )  # Predict zeros (num_draws, batch, data_dim)
+
+        # Calculate target based on vector_field_type
+        if vector_field_type == VectorFieldType.X0:
+            target_batch = x_0_expanded
+        elif vector_field_type == VectorFieldType.EPS:
+            target_batch = eps_batch
+        elif vector_field_type == VectorFieldType.V:
+            # Vmap the target function calculation over the noise draw batch
+            batch_target_v_fn = jax.vmap(
+                loss_instance.target, in_axes=(0, 0, 0, 0, 0)
+            )  # Expects (N, *data), (N, *data), (N, *data), (N, *data), (N,) -> (N, *data)
+            target_batch = batch_target_v_fn(
+                x_t_batch, f_x_t_batch, x_0_expanded, eps_batch, t_expanded
             )
+        else:
+            pytest.fail(f"Unexpected vector_field_type: {vector_field_type}")
 
-    def test_batchwise_loss_with_sample_weights(self):
-        """Test batchwise_loss_factory with varying sample weights."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+        # prediction_loss sums over all sample dims (batch, data_dim in this case)
+        # We need to sum over the original batch and data dimensions (axes 1 and 2)
+        data_axes = tuple(range(1, x_0_expanded.ndim))
+        squared_residuals_batch = jnp.sum(
+            (f_x_t_batch - target_batch) ** 2, axis=data_axes
+        )  # (num_draws,)
+        expected_mean_loss = jnp.mean(squared_residuals_batch)  # Mean over noise draws
 
-        # Initialize loss with EPS target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.EPS)
+        # --- Call the actual function ---
+        actual_loss = loss_instance(
+            call_key, zero_vector_field, x_0, t
+        )  # Takes original x_0 and t
 
-        # Create a test vector field that returns known values
-        class ConstantVectorField(VectorField):
-            def __init__(self):
-                # Define the function to pass to the parent class
-                def const_fn(x, t):
-                    return torch.ones_like(x)
+        assert_allclose(actual_loss, expected_mean_loss, atol=1e-6)
 
-                super().__init__(const_fn, VectorFieldType.EPS)
+    @pytest.mark.parametrize(
+        "vector_field_type",
+        [VectorFieldType.X0, VectorFieldType.EPS, VectorFieldType.V],
+    )
+    @pytest.mark.parametrize("num_noise_draws", [1, 3])
+    def test_call_jit(
+        self,
+        process: DiffusionProcess,
+        vector_field_type: VectorFieldType,
+        num_noise_draws: int,
+    ):
+        """Test __call__ under JIT compilation."""
+        loss_instance = DiffusionLoss(process, vector_field_type, num_noise_draws)
+        key = jax.random.key(7)
+        key, x0_key, call_key = jax.random.split(key, 3)
+        x_0 = jax.random.normal(x0_key, (2, 3))  # Example data point
+        t = jnp.array(0.6)
 
-        # Create test data
+        # Simple vector field (predicts zeros)
+        def zero_vector_field(xt, time):
+            return jnp.zeros_like(xt)
+
+        # Calculate expected loss without JIT
+        expected_loss = loss_instance(call_key, zero_vector_field, x_0, t)
+
+        # JIT the call method. We need to make `vector_field` static.
+        # Note: Jitting loss_instance directly might work if the vector_field is simple enough or hashable,
+        # but using partial and static_argnums is safer.
+        jitted_loss_call = jax.jit(loss_instance.__call__, static_argnums=(1,))
+
+        # Run JITted version
+        actual_loss = jitted_loss_call(call_key, zero_vector_field, x_0, t)
+
+        assert_allclose(
+            actual_loss, expected_loss, atol=1e-5
+        )  # Slightly higher tolerance for JIT
+
+    @pytest.mark.parametrize(
+        "vector_field_type",
+        [VectorFieldType.X0, VectorFieldType.EPS, VectorFieldType.V],
+    )
+    @pytest.mark.parametrize("num_noise_draws", [1, 3])
+    @pytest.mark.parametrize("vmap_axes", [(0, None), (None, 0), (0, 0)])
+    def test_call_vmap_combinations(
+        self,
+        process: DiffusionProcess,
+        vector_field_type: VectorFieldType,
+        num_noise_draws: int,
+        vmap_axes,
+    ):
+        """Test __call__ with VMAP and JIT combinations over x_0 and t."""
+        loss_instance = DiffusionLoss(process, vector_field_type, num_noise_draws)
         batch_size = 4
-        data_dim = 10
+        data_shape = (2, 3)
+        key = jax.random.key(8)
+        key, base_x0_key, base_t_key, base_call_key = jax.random.split(key, 4)
 
-        # Create clean input data and timesteps
-        x_0 = torch.randn(batch_size, data_dim)
-        t = torch.rand(batch_size)
+        # Simple vector field (predicts zeros)
+        def zero_vector_field(xt, time):
+            # Ensure it handles potential batch dims from internal noise draws
+            return jnp.zeros_like(xt)
 
-        # Create vector field
-        vector_field = ConstantVectorField()
+        # --- Prepare inputs based on vmap_axes ---
+        x0_vmap_axis, t_vmap_axis = vmap_axes
+        key_vmap_axis = 0 if (x0_vmap_axis == 0 or t_vmap_axis == 0) else None
 
-        # Create batchwise loss function with 1 noise draw per sample
-        batchwise_loss = loss_fn.batchwise_loss_factory(N_noise_draws_per_sample=1)
+        x0_shape = (batch_size,) + data_shape if x0_vmap_axis == 0 else data_shape
+        t_shape = (batch_size,) if t_vmap_axis == 0 else ()
 
-        # Test with different sample weights
-        uniform_weights = torch.ones(batch_size)
-        loss_uniform = batchwise_loss(vector_field, x_0, t, uniform_weights)
-
-        # Use weights that emphasize the first sample
-        biased_weights = torch.tensor([3.0, 1.0, 1.0, 1.0])
-        loss_biased = batchwise_loss(vector_field, x_0, t, biased_weights)
-
-        # The losses should be different when using different weights
-        assert loss_uniform.item() != loss_biased.item(), (
-            "Different sample weights should produce different losses"
+        x0 = jax.random.normal(base_x0_key, x0_shape)
+        t = jax.random.uniform(base_t_key, shape=t_shape) * 0.9 + 0.05  # Avoid 0 or 1
+        keys = (
+            jax.random.split(base_call_key, batch_size)
+            if key_vmap_axis == 0
+            else base_call_key
         )
 
-    def test_batchwise_loss_vector_field_type_mismatch(self):
-        """Test that batchwise_loss raises an assertion error when vector field type doesn't match target type."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
+        # --- Calculate expected loss (using vmap on the non-jitted function) ---
+        # Define the function signature for vmap
+        call_fn = loss_instance.__call__
 
-        # Initialize loss with X0 target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.X0)
-
-        # Create a vector field with a different type
-        class MismatchedVectorField(VectorField):
-            def __init__(self):
-                # Define the function to pass to the parent class
-                def identity_fn(x, t):
-                    return x
-
-                super().__init__(identity_fn, VectorFieldType.EPS)
-
-        # Create test data
-        batch_size = 4
-        data_dim = 10
-
-        # Create clean input data, timesteps, and sample weights
-        x_0 = torch.randn(batch_size, data_dim)
-        t = torch.rand(batch_size)
-        sample_weights = torch.ones(batch_size)
-
-        # Create vector field
-        vector_field = MismatchedVectorField()
-
-        # Create batchwise loss function
-        batchwise_loss = loss_fn.batchwise_loss_factory(N_noise_draws_per_sample=1)
-
-        # The call should raise an assertion error due to type mismatch
-        with pytest.raises(AssertionError):
-            batchwise_loss(vector_field, x_0, t, sample_weights)
-
-    def test_batchwise_loss_reference_implementation(self):
-        """Test batchwise_loss against a reference implementation to validate correctness."""
-        # Create a simple diffusion process
-        alpha = lambda t: 1 - t
-        sigma = lambda t: t
-        diffusion_process = DiffusionProcess(alpha=alpha, sigma=sigma)
-
-        # Initialize loss with X0 target type
-        loss_fn = SamplewiseDiffusionLoss(diffusion_process, VectorFieldType.X0)
-
-        # Create a simple vector field that returns the input unchanged
-        class IdentityVectorField(VectorField):
-            def __init__(self):
-                # Define the function to pass to the parent class
-                def identity_fn(x, t):
-                    return x
-
-                super().__init__(identity_fn, VectorFieldType.X0)
-
-        # Create test data
-        batch_size = 4
-        data_dim = 10
-
-        # Create clean input data, timesteps, and sample weights
-        x_0 = torch.randn(batch_size, data_dim)
-        t = torch.rand(batch_size)
-        sample_weights = torch.ones(batch_size)
-
-        # Create vector field
-        vector_field = IdentityVectorField()
-
-        # Use a single noise draw for deterministic testing
-        N_noise_draws = 1
-        batchwise_loss = loss_fn.batchwise_loss_factory(
-            N_noise_draws_per_sample=N_noise_draws
+        # Vmap the scalar function to get expected batch output
+        vmapped_call_expected = jax.vmap(
+            call_fn, in_axes=(key_vmap_axis, None, x0_vmap_axis, t_vmap_axis)
         )
+        expected_loss_batch = vmapped_call_expected(keys, zero_vector_field, x0, t)
+        expected_loss = jnp.mean(
+            expected_loss_batch
+        )  # Loss is typically averaged over batch
 
-        # Fix the random seed for reproducibility
-        torch.manual_seed(42)
-        loss = batchwise_loss(vector_field, x_0, t, sample_weights)
-
-        # Reference implementation manually reproducing the steps
-        torch.manual_seed(42)  # Reset seed to get same noise
-        x_expanded = torch.repeat_interleave(x_0, N_noise_draws, dim=0)
-        t_expanded = torch.repeat_interleave(t, N_noise_draws, dim=0)
-        weights_expanded = torch.repeat_interleave(sample_weights, N_noise_draws, dim=0)
-
-        eps = torch.randn_like(x_expanded)
-        x_t = diffusion_process.forward(x_expanded, t_expanded, eps)
-        f_x_t = vector_field(x_t, t_expanded)
-
-        samplewise_loss = loss_fn(x_t, f_x_t, x_expanded, eps, t_expanded)
-        expected_loss = torch.mean(samplewise_loss * weights_expanded)
-
-        # The loss should match the reference implementation
-        assert torch.allclose(loss, expected_loss), (
-            "Loss should match the reference implementation"
+        # --- Test Vmap variations (expecting mean loss over batch) ---
+        # 1. Vmap only
+        vmapped_call = jax.vmap(
+            call_fn,
+            in_axes=(key_vmap_axis, None, x0_vmap_axis, t_vmap_axis),
+            out_axes=0,
         )
+        actual_loss_batch_vmap = vmapped_call(keys, zero_vector_field, x0, t)
+        assert actual_loss_batch_vmap.shape == (batch_size,)
+        assert_allclose(jnp.mean(actual_loss_batch_vmap), expected_loss, atol=1e-6)
+
+        # 2. Jit(Vmap)
+        jit_vmapped_call = jax.jit(vmapped_call, static_argnums=(1,))
+        actual_loss_batch_jit_vmap = jit_vmapped_call(keys, zero_vector_field, x0, t)
+        assert actual_loss_batch_jit_vmap.shape == (batch_size,)
+        assert_allclose(
+            jnp.mean(actual_loss_batch_jit_vmap), expected_loss, atol=1e-5
+        )  # Higher tol for JIT
+
+        # 3. Vmap(Jit)
+        # Need static_argnums for the jitted function before vmapping
+        jitted_call_scalar = jax.jit(call_fn, static_argnums=(1,))
+        vmap_jitted_call = jax.vmap(
+            jitted_call_scalar,
+            in_axes=(key_vmap_axis, None, x0_vmap_axis, t_vmap_axis),
+            out_axes=0,
+        )
+        actual_loss_batch_vmap_jit = vmap_jitted_call(keys, zero_vector_field, x0, t)
+        assert actual_loss_batch_vmap_jit.shape == (batch_size,)
+        assert_allclose(
+            jnp.mean(actual_loss_batch_vmap_jit), expected_loss, atol=1e-5
+        )  # Higher tol for JIT

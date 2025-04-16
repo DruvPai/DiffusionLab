@@ -1,89 +1,46 @@
 import enum
-from typing import Callable
 
-import torch
-
-from diffusionlab.utils import pad_shape_back
+from jax import Array
 
 
 class VectorFieldType(enum.Enum):
+    """
+    Enum representing the type of a vector field.
+    A vector field is a function that takes in x (Array[*data_dims]) and t (Array[])
+    and returns a vector of the same shape as x (Array[*data_dims]).
+    """
+
     SCORE = enum.auto()
     X0 = enum.auto()
     EPS = enum.auto()
     V = enum.auto()
 
 
-class VectorField:
-    """
-    A wrapper around a function (x, t) -> f(x, t) which provides some extra data,
-    namely the type of vector field the function f represents.
-
-    This class encapsulates a vector field function and its type, allowing for
-    consistent handling of different vector field representations in diffusion models.
-
-    Attributes:
-        f (Callable): A function that takes tensors x of shape (N, *D) and t of shape (N,)
-            and returns a tensor of shape (N, *D).
-        vector_field_type (VectorFieldType): The type of vector field the function represents.
-    """
-
-    def __init__(
-        self,
-        f: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
-        vector_field_type: VectorFieldType,
-    ):
-        """
-        Initialize a vector field wrapper.
-
-        Args:
-            f (Callable[[torch.Tensor, torch.Tensor], torch.Tensor]): A function that takes tensors x of shape (N, *D) and t of shape (N,)
-                and returns a tensor of shape (N, *D).
-            vector_field_type (VectorFieldType): The type of vector field the function represents
-                                (SCORE, X0, EPS, or V).
-        """
-        self.f: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = f
-        self.vector_field_type: VectorFieldType = vector_field_type
-
-    def __call__(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
-        """
-        Call the wrapped vector field function.
-
-        Args:
-            x (torch.Tensor): Input tensor of shape (N, *D) where N is the batch size and D represents the data dimensions.
-            t (torch.Tensor): Time parameter tensor of shape (N,).
-
-        Returns:
-            torch.Tensor: Output of the vector field function, of shape (N, *D).
-        """
-        return self.f(x, t)
-
-
 def convert_vector_field_type(
-    x: torch.Tensor,
-    fx: torch.Tensor,
-    alpha: torch.Tensor,
-    sigma: torch.Tensor,
-    alpha_prime: torch.Tensor,
-    sigma_prime: torch.Tensor,
+    x: Array,
+    f_x: Array,
+    alpha: Array,
+    sigma: Array,
+    alpha_prime: Array,
+    sigma_prime: Array,
     in_type: VectorFieldType,
     out_type: VectorFieldType,
-) -> torch.Tensor:
+) -> Array:
     """
     Converts the output of a vector field from one type to another.
 
     Arguments:
-        x (torch.Tensor): A tensor of shape (N, *D), where N is the batch size and D is the shape
-           of the data (e.g., (C, H, W) for images, (D,) for vectors, or (N, D) for token sequences).
-        fx (torch.Tensor): The output of the vector field f, of shape (N, *D).
-        alpha (torch.Tensor): A tensor of shape (N,) representing the scale parameter.
-        sigma (torch.Tensor): A tensor of shape (N,) representing the noise level parameter.
-        alpha_prime (torch.Tensor): A tensor of shape (N,) representing the scale derivative parameter.
-        sigma_prime (torch.Tensor): A tensor of shape (N,) representing the noise level derivative parameter.
-        in_type (VectorFieldType): The type of the input vector field (e.g. Score, X0, Eps, V).
+        x (Array[*data_dims]): The input tensor.
+        f_x (Array[*data_dims]): The output of the vector field f evaluated at x.
+        alpha (Array[]): A scalar representing the scale parameter.
+        sigma (Array[]): A scalar representing the noise level parameter.
+        alpha_prime (Array[]): A scalar representing the scale derivative parameter.
+        sigma_prime (Array[]): A scalar representing the noise level derivative parameter.
+        in_type (VectorFieldType): The type of the input vector field (e.g. SCORE, X0, EPS, V).
         out_type (VectorFieldType): The type of the output vector field.
 
     Returns:
-        torch.Tensor: The converted output of the vector field, of shape (N, *D).
+        Array[*data_dims]: The converted output of the vector field
     """
     """
     Derivation:
@@ -131,56 +88,52 @@ def convert_vector_field_type(
     From (16):
     (17) score(x, alpha, sigma) = (alpha_r * x - E[v | x]) / (sigma^2 * diff_r)
     """
-    alpha = pad_shape_back(alpha, x.shape)
-    alpha_prime = pad_shape_back(alpha_prime, x.shape)
-    sigma = pad_shape_back(sigma, x.shape)
-    sigma_prime = pad_shape_back(sigma_prime, x.shape)
     alpha_ratio = alpha_prime / alpha
     sigma_ratio = sigma_prime / sigma
     ratio_diff = sigma_ratio - alpha_ratio
-    converted_fx = fx
+    converted_fx = f_x
 
     if in_type == VectorFieldType.SCORE:
         if out_type == VectorFieldType.X0:
-            converted_fx = (x + sigma**2 * fx) / alpha  # From equation (12)
+            converted_fx = (x + sigma**2 * f_x) / alpha  # From equation (12)
         elif out_type == VectorFieldType.EPS:
-            converted_fx = -sigma * fx  # From equation (14)
+            converted_fx = -sigma * f_x  # From equation (14)
         elif out_type == VectorFieldType.V:
             converted_fx = (
-                alpha_ratio * x - sigma**2 * ratio_diff * fx
+                alpha_ratio * x - sigma**2 * ratio_diff * f_x
             )  # From equation (16)
 
     elif in_type == VectorFieldType.X0:
         if out_type == VectorFieldType.SCORE:
-            converted_fx = (alpha * fx - x) / sigma**2  # From equation (13)
+            converted_fx = (alpha * f_x - x) / sigma**2  # From equation (13)
         elif out_type == VectorFieldType.EPS:
-            converted_fx = (x - alpha * fx) / sigma  # From equation (4)
+            converted_fx = (x - alpha * f_x) / sigma  # From equation (4)
         elif out_type == VectorFieldType.V:
             converted_fx = (
-                sigma_ratio * x - alpha * ratio_diff * fx
+                sigma_ratio * x - alpha * ratio_diff * f_x
             )  # From equation (9)
 
     elif in_type == VectorFieldType.EPS:
         if out_type == VectorFieldType.SCORE:
-            converted_fx = -fx / sigma  # From equation (15)
+            converted_fx = -f_x / sigma  # From equation (15)
         elif out_type == VectorFieldType.X0:
-            converted_fx = (x - sigma * fx) / alpha  # From equation (3)
+            converted_fx = (x - sigma * f_x) / alpha  # From equation (3)
         elif out_type == VectorFieldType.V:
             converted_fx = (
-                alpha_ratio * x + sigma * ratio_diff * fx
+                alpha_ratio * x + sigma * ratio_diff * f_x
             )  # From equation (7)
 
     elif in_type == VectorFieldType.V:
         if out_type == VectorFieldType.SCORE:
-            converted_fx = (alpha_ratio * x - fx) / (
+            converted_fx = (alpha_ratio * x - f_x) / (
                 sigma**2 * ratio_diff
             )  # From equation (17)
         elif out_type == VectorFieldType.X0:
-            converted_fx = (sigma_ratio * x - fx) / (
+            converted_fx = (sigma_ratio * x - f_x) / (
                 alpha * ratio_diff
             )  # From equation (10)
         elif out_type == VectorFieldType.EPS:
-            converted_fx = (fx - alpha_ratio * x) / (
+            converted_fx = (f_x - alpha_ratio * x) / (
                 sigma * ratio_diff
             )  # From equation (8)
 

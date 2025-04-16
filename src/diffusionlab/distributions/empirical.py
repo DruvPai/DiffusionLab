@@ -1,118 +1,259 @@
-from typing import Any, Dict
+from typing import Iterable, Tuple, cast
 
-import torch
-from torch.utils.data import DataLoader
+import jax
+from jax import Array, numpy as jnp
 
-from diffusionlab.diffusions import DiffusionProcess
+from diffusionlab.dynamics import DiffusionProcess
 from diffusionlab.distributions.base import Distribution
-from diffusionlab.utils import pad_shape_back
+from diffusionlab.vector_fields import VectorFieldType, convert_vector_field_type
 
 
 class EmpiricalDistribution(Distribution):
     """
     An empirical distribution, i.e., the uniform distribution over a dataset.
-    Formally, the distribution is defined as:
+    The probability measure is defined as:
 
-    mu(B) = (1/N) * sum_(i=1)^(N) delta(x_i in B)
+    mu(A) = (1/N) * sum_{i=1}^{num_samples} delta(x_i in A)
 
     where x_i is the ith data point in the dataset, and N is the number of data points.
 
-    Distribution Parameters:
-        - None
+    This class provides methods for sampling from the empirical distribution and computing various
+    vector fields (score, x0, eps, v) related to the distribution under a
+    given diffusion process.
 
-    Distribution Hyperparameters:
-        - labeled_data: A DataLoader of data which spawns the empirical distribution, where each data sample is a (data, label) tuple. Both data and label are PyTorch tensors.
-
-    Note:
-        - This class has no sample() method as it's difficult to sample randomly from a DataLoader. In practice, you can sample directly from the DataLoader and apply filtering there.
+    Attributes:
+        dist_params (Dict[str, Array]): Dictionary containing distribution parameters (currently unused).
+        dist_hparams (Dict[str, Any]): Dictionary for storing hyperparameters.
+            - labeled_data (Iterable[Tuple[Array, Array]] | Iterable[Tuple[Array, None]]): An iterable of data whose elements (samples) are tuples of (data batch, label batch). The label batch can be None if the data is unlabelled.
     """
 
-    @classmethod
-    def validate_hparams(cls, dist_hparams: Dict[str, Any]) -> None:
-        """
-        Validate the hyperparameters for the empirical distribution.
+    def __init__(
+        self, labeled_data: Iterable[Tuple[Array, Array]] | Iterable[Tuple[Array, None]]
+    ):
+        super().__init__(
+            dist_params={},
+            dist_hparams={"labeled_data": labeled_data},
+        )
 
-        Arguments:
-            dist_hparams: A dictionary of hyperparameters for the distribution.
-                Must contain 'labeled_data' which is a DataLoader.
+    def sample(
+        self, key: Array, num_samples: int
+    ) -> Tuple[Array, Array] | Tuple[Array, None]:
+        """
+        Sample from the empirical distribution using reservoir sampling.
+        Assumes all batches in `labeled_data` are consistent: either all have labels (Array)
+        or none have labels (None).
+
+        Args:
+            key (Array): The Jax PRNG key to use for sampling.
+            num_samples (int): The number of samples to draw.
 
         Returns:
-            None
-
-        Throws:
-            AssertionError: If the parameters are invalid.
+            Tuple[Array[num_samples, *data_dims], Array[num_samples, *label_dims]] | Tuple[Array[num_samples, *data_dims], None]: A tuple containing the samples and corresponding labels (stacked into an Array), or samples and None.
         """
-        assert "labeled_data" in dist_hparams
-        labeled_data = dist_hparams["labeled_data"]
-        assert isinstance(labeled_data, DataLoader)
-        assert len(labeled_data) > 0
+        data_iterator = iter(self.dist_hparams["labeled_data"])  # Get an iterator
 
-    @classmethod
-    def x0(
-        cls,
-        x_t: torch.Tensor,
-        t: torch.Tensor,
+        # Initialize reservoir
+        reservoir_samples = []
+        reservoir_labels = []  # Will store labels if present, otherwise remains empty
+        items_seen = 0
+        is_labeled = None  # Determine based on first batch
+
+        for X_batch, y_batch in data_iterator:
+            # Determine if data is labeled based on the first batch encountered
+            if is_labeled is None:
+                is_labeled = y_batch is not None
+                if is_labeled:
+                    # Basic validation for the first labeled batch
+                    if (
+                        not isinstance(y_batch, jnp.ndarray)
+                        or y_batch.shape[0] != X_batch.shape[0]
+                    ):
+                        raise ValueError(
+                            f"First labeled batch has inconsistent shape. X shape: {X_batch.shape}, Y shape: {getattr(y_batch, 'shape', 'N/A')}"
+                        )
+                # else: y_batch is None, is_labeled remains False
+
+            current_batch_size = X_batch.shape[0]
+
+            # Reservoir sampling
+            for i in range(current_batch_size):
+                x = X_batch[i]
+                y = y_batch[i] if is_labeled else None
+
+                if items_seen < num_samples:
+                    reservoir_samples.append(x)
+                    if is_labeled:
+                        reservoir_labels.append(y)
+                else:
+                    key, subkey = jax.random.split(key)
+                    j = jax.random.randint(
+                        subkey, shape=(), minval=0, maxval=items_seen + 1
+                    )
+                    if j < num_samples:
+                        reservoir_samples[j] = x
+                        if is_labeled:
+                            reservoir_labels[j] = y
+
+                items_seen += 1
+
+        # Final checks and return
+        if items_seen < num_samples:
+            raise ValueError(
+                f"Requested {num_samples} samples, but only {items_seen} items are available in the dataset."
+            )
+
+        # Stack samples into a single array
+        stacked_samples = jnp.stack(reservoir_samples)
+
+        # Stack labels if data was labeled, otherwise return None
+        stacked_labels = None
+        if is_labeled:
+            stacked_labels = jnp.stack(reservoir_labels)
+            return stacked_samples, stacked_labels
+        else:
+            return stacked_samples, None
+
+    def score(
+        self,
+        x_t: Array,
+        t: Array,
         diffusion_process: DiffusionProcess,
-        batched_dist_params: Dict[str, torch.Tensor],
-        dist_hparams: Dict[str, Any],
-    ) -> torch.Tensor:
+    ) -> Array:
         """
-        Computes the denoiser E[x_0 | x_t] for an empirical distribution.
+        Computes the score function (∇_x log p_t(x)) of the empirical distribution at time t,
+        given the noisy state x_t and the diffusion process.
+
+        Args:
+            x_t (Array[*data_dims]): The noisy state tensor at time t.
+            t (Array[]): The time tensor.
+            diffusion_process (DiffusionProcess): The diffusion process.
+
+        Returns:
+            Array[*data_dims]: The score of the empirical distribution at (x_t, t).
+        """
+        x0_x_t = self.x0(x_t, t, diffusion_process)
+        alpha_t = diffusion_process.alpha(t)
+        sigma_t = diffusion_process.sigma(t)
+        alpha_prime_t = diffusion_process.alpha_prime(t)
+        sigma_prime_t = diffusion_process.sigma_prime(t)
+        score_x_t = convert_vector_field_type(
+            x_t,
+            x0_x_t,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            VectorFieldType.X0,
+            VectorFieldType.SCORE,
+        )
+        return score_x_t
+
+    def x0(
+        self,
+        x_t: Array,
+        t: Array,
+        diffusion_process: DiffusionProcess,
+    ) -> Array:
+        """
+        Computes the denoiser E[x_0 | x_t] for an empirical distribution w.r.t. a given diffusion process.
 
         This method computes the denoiser by performing a weighted average of the
         dataset samples, where the weights are determined by the likelihood of x_t
         given each sample.
 
         Arguments:
-            x_t: The input tensor, of shape (N, *D), where *D is the shape of each data.
-            t: The time tensor, of shape (N, ).
-            diffusion_process: The diffusion process.
-            batched_dist_params: A dictionary of batched parameters for the distribution.
-                Not used for empirical distribution.
-            dist_hparams: A dictionary of hyperparameters for the distribution.
-                Must contain 'labeled_data' which is a DataLoader.
+            x_t (Array[*data_dims]): The input tensor.
+            t (Array[]): The time tensor.
+            diffusion_process (DiffusionProcess): The diffusion process.
 
         Returns:
-            The prediction of x_0, of shape (N, *D).
+            Array[*data_dims]: The prediction of x_0.
         """
-        data = dist_hparams["labeled_data"]
+        data = self.dist_hparams["labeled_data"]
 
-        x_flattened = torch.flatten(x_t, start_dim=1, end_dim=-1)  # (N, *D)
+        alpha_t = diffusion_process.alpha(t)
+        sigma_t = diffusion_process.sigma(t)
 
-        alpha = diffusion_process.alpha(t)  # (N, )
-        sigma = diffusion_process.sigma(t)  # (N, )
-
-        softmax_denom = torch.zeros_like(t)  # (N, )
-        x0_hat = torch.zeros_like(x_t)  # (N, *D)
+        softmax_denom = jnp.zeros_like(t)
+        x0_hat = jnp.zeros_like(x_t)
         for X_batch, y_batch in data:
-            X_batch = X_batch.to(x_t.device, non_blocking=True)  # (B, *D)
-            X_batch_flattened = torch.flatten(X_batch, start_dim=1, end_dim=-1)[
-                None, ...
-            ]  # (1, B, D*)
-            alpha_X_batch_flattened = (
-                pad_shape_back(alpha, X_batch_flattened.shape) * X_batch_flattened
-            )  # (N, B, D*)
-            dists = (
-                torch.cdist(x_flattened[:, None, ...], alpha_X_batch_flattened)[
-                    :, 0, ...
-                ]
-                ** 2
-            )  # (N, B)
-            exp_dists = torch.exp(
-                -dists / (2 * pad_shape_back(sigma, dists.shape) ** 2)
-            )  # (N, B)
-            softmax_denom += torch.sum(exp_dists, dim=-1)  # (N, )
-            x0_hat += torch.sum(
-                pad_shape_back(exp_dists, X_batch[None, ...].shape)
-                * X_batch[None, ...],  # (N, B, *D)
-                dim=1,
-            )  # (N, *D)
+            squared_dists = jax.vmap(lambda x: jnp.sum((x_t - alpha_t * x) ** 2))(
+                X_batch
+            )
+            exp_negative_dists = jnp.exp(-squared_dists / (2 * sigma_t**2))
+            softmax_denom += jnp.sum(exp_negative_dists)
+            x0_hat += jnp.sum(exp_negative_dists[:, None] * X_batch, axis=0)
 
-        softmax_denom = torch.maximum(
-            softmax_denom,
-            torch.tensor(
-                torch.finfo(softmax_denom.dtype).eps, device=softmax_denom.device
-            ),
-        )
-        x0_hat = x0_hat / pad_shape_back(softmax_denom, x0_hat.shape)  # (N, *D)
+        eps = cast(float, jnp.finfo(softmax_denom.dtype).eps)
+        jax.debug.print("softmax_denom: {x}", x=softmax_denom)
+        softmax_denom = jnp.maximum(softmax_denom, eps)
+        x0_hat = x0_hat / softmax_denom
         return x0_hat
+
+    def eps(
+        self,
+        x_t: Array,
+        t: Array,
+        diffusion_process: DiffusionProcess,
+    ) -> Array:
+        """
+        Computes the noise field eps(x_t, t) for an empirical distribution w.r.t. a given diffusion process.
+
+        Args:
+            x_t (Array[*data_dims]): The input tensor.
+            t (Array[]): The time tensor.
+            diffusion_process (DiffusionProcess): The diffusion process.
+
+        Returns:
+            Array[*data_dims]: The noise field at (x_t, t).
+        """
+        x0_x_t = self.x0(x_t, t, diffusion_process)
+        alpha_t = diffusion_process.alpha(t)
+        sigma_t = diffusion_process.sigma(t)
+        alpha_prime_t = diffusion_process.alpha_prime(t)
+        sigma_prime_t = diffusion_process.sigma_prime(t)
+        eps_x_t = convert_vector_field_type(
+            x_t,
+            x0_x_t,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            VectorFieldType.X0,
+            VectorFieldType.EPS,
+        )
+        return eps_x_t
+
+    def v(
+        self,
+        x_t: Array,
+        t: Array,
+        diffusion_process: DiffusionProcess,
+    ) -> Array:
+        """
+        Computes the velocity field v(x_t, t) for an empirical distribution w.r.t. a given diffusion process.
+
+        Args:
+            x_t (Array[*data_dims]): The input tensor.
+            t (Array[]): The time tensor.
+            diffusion_process (DiffusionProcess): The diffusion process.
+
+        Returns:
+            Array[*data_dims]: The velocity field at (x_t, t).
+        """
+        x0_x_t = self.x0(x_t, t, diffusion_process)
+        alpha_t = diffusion_process.alpha(t)
+        sigma_t = diffusion_process.sigma(t)
+        alpha_prime_t = diffusion_process.alpha_prime(t)
+        sigma_prime_t = diffusion_process.sigma_prime(t)
+        v_x_t = convert_vector_field_type(
+            x_t,
+            x0_x_t,
+            alpha_t,
+            sigma_t,
+            alpha_prime_t,
+            sigma_prime_t,
+            VectorFieldType.X0,
+            VectorFieldType.V,
+        )
+        return v_x_t

@@ -1,18 +1,18 @@
 from typing import Callable
+from dataclasses import dataclass, field
+import jax
+from jax import numpy as jnp, Array
 
-import torch
-from torch import nn
-
-from diffusionlab.diffusions import DiffusionProcess
-from diffusionlab.utils import pad_shape_back
-from diffusionlab.vector_fields import VectorField, VectorFieldType
+from diffusionlab.dynamics import DiffusionProcess
+from diffusionlab.vector_fields import VectorFieldType
 
 
-class SamplewiseDiffusionLoss(nn.Module):
+@dataclass
+class DiffusionLoss:
     """
-    Sample-wise loss function for training diffusion models.
+    Loss function for training diffusion models.
 
-    This class implements various loss functions for diffusion models based on the specified
+    This dataclass implements various loss functions for diffusion models based on the specified
     target type. The loss is computed as the mean squared error between the model's prediction
     and the target, which depends on the chosen vector field type.
 
@@ -23,219 +23,121 @@ class SamplewiseDiffusionLoss(nn.Module):
     - SCORE: Not directly supported (raises ValueError)
 
     Attributes:
-        diffusion (DiffusionProcess): The diffusion process defining the forward dynamics
-        target_type (VectorFieldType): The type of target to learn via minimizing the loss function
-        target (Callable): Function that computes the target based on the specified target_type.
-                          Takes tensors of shapes (N, *D) for x_t, f_x_t, x_0, eps and (N,) for t,
-                          and returns a tensor of shape (N, *D).
+        diffusion_process (DiffusionProcess): The diffusion process defining the forward dynamics
+        vector_field_type (VectorFieldType): The type of target to learn to estimate via minimizing the loss function.
+        num_noise_draws_per_sample (int): The number of noise draws per sample to use for the batchwise loss.
+        target (Callable[Array, Array, Array, Array, Array] -> Array): Function that computes the target based on the specified target_type.
+            Signature: (x_t: Array[*data_dims], f_x_t: Array[*data_dims], x_0: Array[*data_dims], eps: Array[*data_dims], t: Array[]) -> Array[*data_dims]
     """
 
-    def __init__(
-        self, diffusion_process: DiffusionProcess, target_type: VectorFieldType
-    ) -> None:
-        """
-        Initialize the diffusion loss function.
+    diffusion_process: DiffusionProcess
+    vector_field_type: VectorFieldType
+    num_noise_draws_per_sample: int
+    target: Callable[[Array, Array, Array, Array, Array], Array] = field(init=False)
 
-        Args:
-            diffusion_process: The diffusion process to use, containing data about the forward evolution.
-            target_type: The type of target to learn via minimizing the loss function.
-                         Must be one of VectorFieldType.X0, VectorFieldType.EPS, or VectorFieldType.V.
+    def __post_init__(self):
+        match self.vector_field_type:
+            case VectorFieldType.X0:
 
-        Raises:
-            ValueError: If target_type is VectorFieldType.SCORE, which is not directly supported.
-        """
-        super().__init__()
-        self.diffusion_process: DiffusionProcess = diffusion_process
-        self.target_type: VectorFieldType = target_type
+                def target(
+                    x_t: Array, f_x_t: Array, x_0: Array, eps: Array, t: Array
+                ) -> Array:
+                    return x_0
 
-        if target_type == VectorFieldType.X0:
+            case VectorFieldType.EPS:
 
-            def target(
-                x_t: torch.Tensor,
-                f_x_t: torch.Tensor,
-                x_0: torch.Tensor,
-                eps: torch.Tensor,
-                t: torch.Tensor,
-            ) -> torch.Tensor:
-                """
-                Target function for predicting the original clean data x_0.
+                def target(
+                    x_t: Array, f_x_t: Array, x_0: Array, eps: Array, t: Array
+                ) -> Array:
+                    return eps
 
-                Args:
-                    x_t (torch.Tensor): The noised data at time t, of shape (N, *D).
-                    f_x_t (torch.Tensor): The model's prediction at time t, of shape (N, *D).
-                    x_0 (torch.Tensor): The original clean data, of shape (N, *D).
-                    eps (torch.Tensor): The noise used to generate x_t, of shape (N, *D).
-                    t (torch.Tensor): The time parameter, of shape (N,).
+            case VectorFieldType.V:
 
-                Returns:
-                    torch.Tensor: The target tensor x_0, of shape (N, *D).
-                """
-                return x_0
+                def target(
+                    x_t: Array, f_x_t: Array, x_0: Array, eps: Array, t: Array
+                ) -> Array:
+                    return (
+                        self.diffusion_process.alpha_prime(t) * x_0
+                        + self.diffusion_process.sigma_prime(t) * eps
+                    )
 
-        elif target_type == VectorFieldType.EPS:
-
-            def target(
-                x_t: torch.Tensor,
-                f_x_t: torch.Tensor,
-                x_0: torch.Tensor,
-                eps: torch.Tensor,
-                t: torch.Tensor,
-            ) -> torch.Tensor:
-                """
-                Target function for predicting the noise component eps.
-
-                Args:
-                    x_t (torch.Tensor): The noised data at time t, of shape (N, *D).
-                    f_x_t (torch.Tensor): The model's prediction at time t, of shape (N, *D).
-                    x_0 (torch.Tensor): The original clean data, of shape (N, *D).
-                    eps (torch.Tensor): The noise used to generate x_t, of shape (N, *D).
-                    t (torch.Tensor): The time parameter, of shape (N,).
-
-                Returns:
-                    torch.Tensor: The target tensor eps, of shape (N, *D).
-                """
-                return eps
-
-        elif target_type == VectorFieldType.V:
-
-            def target(
-                x_t: torch.Tensor,
-                f_x_t: torch.Tensor,
-                x_0: torch.Tensor,
-                eps: torch.Tensor,
-                t: torch.Tensor,
-            ) -> torch.Tensor:
-                """
-                Target function for predicting the velocity field v.
-
-                Args:
-                    x_t (torch.Tensor): The noised data at time t, of shape (N, *D).
-                    f_x_t (torch.Tensor): The model's prediction at time t, of shape (N, *D).
-                    x_0 (torch.Tensor): The original clean data, of shape (N, *D).
-                    eps (torch.Tensor): The noise used to generate x_t, of shape (N, *D).
-                    t (torch.Tensor): The time parameter, of shape (N,).
-
-                Returns:
-                    torch.Tensor: The velocity field target tensor, of shape (N, *D).
-                """
-                return (
-                    pad_shape_back(self.diffusion_process.alpha_prime(t), x_0.shape)
-                    * x_0
-                    + pad_shape_back(self.diffusion_process.sigma_prime(t), x_0.shape)
-                    * eps
+            case VectorFieldType.SCORE:
+                raise ValueError(
+                    "Direct score matching is not supported due to lack of a known target function, and other ways (like Hutchinson's trace estimator) are very high variance."
                 )
 
-        elif target_type == VectorFieldType.SCORE:
-            raise ValueError(
-                "Direct score matching is not supported due to lack of a known target function, and other ways (like Hutchinson's trace estimator) are very high variance."
-            )
+            case _:
+                raise ValueError(f"Invalid target type: {self.vector_field_type}")
 
-        self.target: Callable[
-            [torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
-            torch.Tensor,
-        ] = target
+        self.target = target
 
-    def forward(
-        self,
-        x_t: torch.Tensor,
-        f_x_t: torch.Tensor,
-        x_0: torch.Tensor,
-        eps: torch.Tensor,
-        t: torch.Tensor,
-    ) -> torch.Tensor:
+    def prediction_loss(
+        self, x_t: Array, f_x_t: Array, x_0: Array, eps: Array, t: Array
+    ) -> Array:
         """
-        Compute the loss for each sample in the batch.
+        Compute the loss given a prediction and inputs/targets.
 
         This method calculates the mean squared error between the model's prediction (f_x_t)
         and the target value determined by the target_type.
 
         Args:
-            x_t (torch.Tensor): The noised data at time t, of shape (N, *D) where N is the batch size
-                               and D represents the data dimensions.
-            f_x_t (torch.Tensor): The model's prediction at time t, of shape (N, *D).
-            x_0 (torch.Tensor): The original clean data, of shape (N, *D).
-            eps (torch.Tensor): The noise used to generate x_t, of shape (N, *D).
-            t (torch.Tensor): The time parameter, of shape (N,).
+            x_t (Array[*data_dims]): The noised data at time t.
+            f_x_t (Array[*data_dims]): The model's prediction at time t.
+            x_0 (Array[*data_dims]): The original clean data.
+            eps (Array[*data_dims]): The noise used to generate x_t.
+            t (Array[]): The scalar time parameter.
 
         Returns:
-            torch.Tensor: The per-sample loss values, of shape (N,) where N is the batch size.
+            Array[]: The scalar loss value for the given sample.
         """
-        # Compute squared error between prediction and target
         squared_residuals = (f_x_t - self.target(x_t, f_x_t, x_0, eps, t)) ** 2
-
-        # Sum over all dimensions except batch dimension
-        samplewise_loss = torch.sum(
-            torch.flatten(squared_residuals, start_dim=1, end_dim=-1), dim=1
-        )
-
+        samplewise_loss = jnp.sum(squared_residuals)
         return samplewise_loss
 
-    def batchwise_loss_factory(
-        self, N_noise_draws_per_sample: int
-    ) -> Callable[
-        [VectorField, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor
-    ]:
+    def __call__(
+        self,
+        key: Array,
+        vector_field: Callable[[Array, Array], Array],
+        x_0: Array,
+        t: Array,
+    ) -> Array:
         """
-        Create a batchwise loss function that averages the samplewise loss over multiple noise draws per sample.
+        Compute the average loss over multiple noise samples for a single data point and time.
 
-        This factory method returns a function that can be used during training to compute the loss
-        for a batch of data. The returned function handles the process of:
-        1. Repeating each sample N times to apply different noise realizations
-        2. Adding noise according to the diffusion process
-        3. Computing model predictions
-        4. Calculating and weighting the loss
+        This method estimates the expected loss at a given time `t` for a clean data sample `x_0`.
+        It does this by drawing `num_noise_draws_per_sample` noise vectors (`eps`), generating
+        the corresponding noisy samples `x_t` using the `diffusion_process`, predicting the
+        target quantity `f_x_t` using the provided `vector_field` (vmapped internally), and then calculating the
+        `prediction_loss` for each noise sample. The final loss is the average over these samples.
 
         Args:
-            N_noise_draws_per_sample (int): The number of different noise realizations to use
-                for each data sample. Higher values can reduce variance but increase computation.
+            key (Array): The PRNG key for noise generation. Shape: [2].
+            vector_field (Callable[[Array, Array], Array]): The vector field function that takes
+                a single noisy data sample `x_t` and its corresponding time `t`, and returns the model's prediction `f_x_t`.
+                Signature: (x_t: Array[*data_dims], t: Array[]) -> Array[*data_dims].
+                This function will be vmapped internally over the batch dimension created by `num_noise_draws_per_sample`.
+            x_0 (Array[*data_dims]): The original clean data sample.
+            t (Array[]): The scalar time parameter.
 
         Returns:
-            Callable[[VectorField, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
-                A function that computes the weighted average loss across a batch with the signature:
-                (vector_field, data, timesteps, sample_weights) -> scalar_loss
+            Array[]: The scalar loss value, averaged over `num_noise_draws_per_sample` noise instances.
         """
+        x_0_batch = x_0[None, ...].repeat(self.num_noise_draws_per_sample, axis=0)
+        t_batch = t[None].repeat(self.num_noise_draws_per_sample, axis=0)
+        eps_batch = jax.random.normal(key, x_0_batch.shape)
 
-        def batchwise_loss(
-            f: VectorField,
-            x: torch.Tensor,
-            t: torch.Tensor,
-            sample_weights: torch.Tensor,
-        ) -> torch.Tensor:
-            """
-            Compute the weighted average loss across a batch with multiple noise draws per sample.
+        batch_diffusion_forward = jax.vmap(
+            self.diffusion_process.forward, in_axes=(0, 0, 0)
+        )
+        x_t_batch = batch_diffusion_forward(x_0_batch, t_batch, eps_batch)
 
-            This function:
-            1. Verifies the vector field type matches the target type
-            2. Repeats each sample N_noise_draws_per_sample times to apply different noise realizations
-            3. Adds noise to the data according to the diffusion process at time t
-            4. Computes the model's predictions
-            5. Calculates the per-sample loss and applies sample weights
-            6. Returns the mean loss across all samples and noise draws
+        batch_vector_field = jax.vmap(vector_field, in_axes=(0, 0))
+        f_x_t_batch = batch_vector_field(x_t_batch, t_batch)
 
-            Args:
-                f (VectorField): The vector field model to evaluate, must match the target type
-                    of this loss function.
-                x (torch.Tensor): The clean input data, of shape (N, *D).
-                t (torch.Tensor): The diffusion timesteps, of shape (N,).
-                sample_weights (torch.Tensor): The importance weights for each sample in the batch,
-                    of shape (N,). Used to prioritize certain samples in the loss.
+        batch_prediction_loss = jax.vmap(self.prediction_loss, in_axes=(0, 0, 0, 0, 0))
+        losses = batch_prediction_loss(
+            x_t_batch, f_x_t_batch, x_0_batch, eps_batch, t_batch
+        )
 
-            Returns:
-                torch.Tensor: A scalar tensor containing the weighted average loss.
-            """
-            assert f.vector_field_type == self.target_type
-            x = torch.repeat_interleave(x, N_noise_draws_per_sample, dim=0)
-            t = torch.repeat_interleave(t, N_noise_draws_per_sample, dim=0)
-            sample_weights = torch.repeat_interleave(
-                sample_weights, N_noise_draws_per_sample, dim=0
-            )
-
-            eps = torch.randn_like(x)
-            xt = self.diffusion_process.forward(x, t, eps)
-            fxt = f(xt, t)
-
-            samplewise_loss = self(xt, fxt, x, eps, t)
-            mean_loss = torch.mean(samplewise_loss * sample_weights)
-            return mean_loss
-
-        return batchwise_loss
+        loss_value = jnp.mean(losses)
+        return loss_value
