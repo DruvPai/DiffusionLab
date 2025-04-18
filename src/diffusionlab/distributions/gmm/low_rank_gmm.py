@@ -1,4 +1,5 @@
 from typing import Tuple, cast
+from dataclasses import dataclass
 from jax import numpy as jnp, Array
 import jax
 from diffusionlab.distributions.base import Distribution
@@ -11,23 +12,25 @@ from diffusionlab.distributions.gmm.utils import (
 from diffusionlab.dynamics import DiffusionProcess
 
 
+@dataclass(frozen=True)
 class LowRankGMM(Distribution):
     """
     Implements a low-rank Gaussian Mixture Model (GMM) distribution.
 
     The probability measure is given by:
-    mu(A) = sum_{i=1}^{num_components} priors[i] * N(A; means[i], cov_factors[i] @ cov_factors[i].T)
 
-    This class provides methods for sampling from the GMM and computing various
-    vector fields (score, x0, eps, v) related to the distribution under a
-    given diffusion process.
+    ``μ(A) = sum_{i=1}^{num_components} priors[i] * N(A; means[i], cov_factors[i] @ cov_factors[i].T)``
+
+    This class provides methods for sampling from the GMM and computing various vector fields (``VectorFieldType.SCORE``, ``VectorFieldType.X0``, ``VectorFieldType.EPS``, ``VectorFieldType.V``) related to the distribution under a given diffusion process.
 
     Attributes:
-        dist_params (Dict[str, Array]): Dictionary containing the core GMM parameters.
-            - means (Array[num_components, data_dim]): The means of the GMM components.
-            - cov_factors (Array[num_components, data_dim, rank]): The low-rank covariance matrix factors of the GMM components.
-            - priors (Array[num_components]): The prior probabilities (mixture weights) of the GMM components.
-        dist_hparams (Dict[str, Any]): Dictionary for storing hyperparameters (currently unused).
+        dist_params (``Dict[str, Array]``): Dictionary containing the core low-rank GMM parameters.
+
+            - ``means`` (``Array[num_components, data_dim]``): The means of the GMM components.
+            - ``cov_factors`` (``Array[num_components, data_dim, rank]``): The low-rank covariance matrix factors of the GMM components.
+            - ``priors`` (``Array[num_components]``): The prior probabilities (mixture weights) of the GMM components.
+
+        dist_hparams (``Dict[str, Any]``): Dictionary for storing hyperparameters (currently unused).
     """
 
     def __init__(self, means: Array, cov_factors: Array, priors: Array):
@@ -35,9 +38,9 @@ class LowRankGMM(Distribution):
         Initializes the low-rank GMM distribution.
 
         Args:
-            means (Array[num_components, data_dim]): Means for each Gaussian component.
-            cov_factors (Array[num_components, data_dim, rank]): Low-rank covariance matrices for each Gaussian component.
-            priors (Array[num_components]): Mixture weights for each component. Must sum to 1.
+            means (``Array[num_components, data_dim]``): Means for each Gaussian component.
+            cov_factors (``Array[num_components, data_dim, rank]``): Low-rank covariance matrices for each Gaussian component.
+            priors (``Array[num_components]``): Mixture weights for each component. Must sum to 1.
         """
         eps = cast(float, jnp.finfo(cov_factors.dtype).eps)
         assert means.ndim == 2
@@ -60,13 +63,11 @@ class LowRankGMM(Distribution):
         Draws samples from the low-rank GMM distribution.
 
         Args:
-            key (Array): Jax PRNG key for random sampling.
-            num_samples (int): The total number of samples to generate.
+            key (``Array``): JAX PRNG key for random sampling.
+            num_samples (``int``): The total number of samples to generate.
 
         Returns:
-            Tuple[Array[num_samples, data_dim], Array[num_samples]]:
-                - samples (Array[num_samples, data_dim]): The drawn samples.
-                - component_indices (Array[num_samples]): The index of the GMM component from which each sample was drawn.
+            ``Tuple[Array[num_samples, data_dim], Array[num_samples]]``: A tuple ``(samples, component_indices)`` containing the drawn samples and the index of the GMM component from which each sample was drawn.
         """
         covs = jax.vmap(
             lambda low_rank_cov_factor: low_rank_cov_factor @ low_rank_cov_factor.T
@@ -77,18 +78,18 @@ class LowRankGMM(Distribution):
 
     def score(self, x_t: Array, t: Array, diffusion_process: DiffusionProcess) -> Array:
         """
-        Computes the score vector field (∇_x log p_t(x_t)) for the low-rank GMM distribution.
+        Computes the score vector field ``∇_x log p_t(x_t)`` for the low-rank GMM distribution.
 
-        This is calculated with respect to the perturbed distribution p_t induced by the
-        `diffusion_process` at time `t`.
+        This is calculated with respect to the perturbed distribution ``p_t`` induced by the
+        ``diffusion_process`` at time ``t``.
 
         Args:
-            x_t (Array[data_dim]): The noisy state tensor at time `t`.
-            t (Array[]): The time step (scalar).
-            diffusion_process (DiffusionProcess): The diffusion process definition.
+            x_t (``Array[data_dim]``): The noisy state tensor at time ``t``.
+            t (``Array[]``): The time step (scalar).
+            diffusion_process (``DiffusionProcess``): The diffusion process definition.
 
         Returns:
-            Array[data_dim]: The score vector field evaluated at `x_t` and `t`.
+            ``Array[data_dim]``: The score vector field evaluated at ``x_t`` and ``t``.
         """
         return low_rank_gmm_score(
             x_t,
@@ -103,16 +104,16 @@ class LowRankGMM(Distribution):
         """
         Computes the denoised prediction x0 = E[x_0 | x_t] for the low-rank GMM distribution.
 
-        This represents the expected original sample `x_0` given the noisy observation `x_t`
-        at time `t` under the `diffusion_process`.
+        This represents the expected original sample ``x_0`` given the noisy observation ``x_t``
+        at time ``t`` under the ``diffusion_process``.
 
         Args:
-            x_t (Array[data_dim]): The noisy state tensor at time `t`.
-            t (Array[]): The time step (scalar).
-            diffusion_process (DiffusionProcess): The diffusion process definition.
+            x_t (``Array[data_dim]``): The noisy state tensor at time ``t``.
+            t (``Array[]``): The time step (scalar).
+            diffusion_process (``DiffusionProcess``): The diffusion process definition.
 
         Returns:
-            Array[data_dim]: The denoised prediction vector field `x0` evaluated at `x_t` and `t`.
+            ``Array[data_dim]``: The denoised prediction vector field ``x0`` evaluated at ``x_t`` and ``t``.
         """
         return low_rank_gmm_x0(
             x_t,
@@ -127,16 +128,16 @@ class LowRankGMM(Distribution):
         """
         Computes the noise prediction ε for the low-rank GMM distribution.
 
-        This predicts the noise that was added to the original sample `x_0` to obtain `x_t`
-        at time `t` under the `diffusion_process`.
+        This predicts the noise that was added to the original sample ``x_0`` to obtain ``x_t``
+        at time ``t`` under the ``diffusion_process``.
 
         Args:
-            x_t (Array[data_dim]): The noisy state tensor at time `t`.
-            t (Array[]): The time step (scalar).
-            diffusion_process (DiffusionProcess): The diffusion process definition.
+            x_t (``Array[data_dim]``): The noisy state tensor at time ``t``.
+            t (``Array[]``): The time step (scalar).
+            diffusion_process (``DiffusionProcess``): The diffusion process definition.
 
         Returns:
-            Array[data_dim]: The noise prediction vector field `ε` evaluated at `x_t` and `t`.
+            ``Array[data_dim]``: The noise prediction vector field ``ε`` evaluated at ``x_t`` and ``t``.
         """
         return low_rank_gmm_eps(
             x_t,
@@ -149,17 +150,17 @@ class LowRankGMM(Distribution):
 
     def v(self, x_t: Array, t: Array, diffusion_process: DiffusionProcess) -> Array:
         """
-        Computes the velocity vector field `v` for the low-rank GMM distribution.
+        Computes the velocity vector field ``v`` for the low-rank GMM distribution.
 
-        This relates to the conditional velocity E[dx_t/dt | x_t] under the `diffusion_process`.
+        This is the conditional velocity ``E[dx_t/dt | x_t]`` under the ``diffusion_process``.
 
         Args:
-            x_t (Array[data_dim]): The noisy state tensor at time `t`.
-            t (Array[]): The time step (scalar).
-            diffusion_process (DiffusionProcess): The diffusion process definition.
+            x_t (``Array[data_dim]``): The noisy state tensor at time ``t``.
+            t (``Array[]``): The time step (scalar).
+            diffusion_process (``DiffusionProcess``): The diffusion process definition.
 
         Returns:
-            Array[data_dim]: The velocity vector field `v` evaluated at `x_t` and `t`.
+            ``Array[data_dim]``: The velocity vector field ``v`` evaluated at ``x_t`` and ``t``.
         """
         return low_rank_gmm_v(
             x_t,
@@ -180,22 +181,22 @@ def low_rank_gmm_x0(
     priors: Array,
 ) -> Array:
     """
-    Computes the denoised prediction x0 = E[x_0 | x_t] for a low-rank GMM.
+    Computes the denoised prediction ``x0 = E[x_0 | x_t]`` for a low-rank GMM.
 
     This implements the closed-form solution for the conditional expectation
-    E[x_0 | x_t] where x_t ~ N(α_t x_0, σ_t^2 I) and x_0 follows the low-rank GMM distribution
-    defined by means, cov_factors, and priors.
+    ``E[x_0 | x_t]`` where ``x_t ~ N(α_t x_0, σ_t^2 I)`` and ``x_0`` follows the low-rank GMM distribution
+    defined by ``means``, ``cov_factors``, and ``priors``.
 
     Args:
-        x_t (Array[data_dim]): The noisy state tensor at time `t`.
-        t (Array[]): The time step (scalar).
-        diffusion_process (DiffusionProcess): Provides α(t) and σ(t).
-        means (Array[num_components, data_dim]): Means of the GMM components.
-        cov_factors (Array[num_components, data_dim, rank]): Low-rank covariance matrices of the GMM components.
-        priors (Array[num_components]): Mixture weights of the GMM components.
+        x_t (``Array[data_dim]``): The noisy state tensor at time ``t``.
+        t (``Array[]``): The time step (scalar).
+        diffusion_process (``DiffusionProcess``): Provides ``α(t)`` and ``σ(t)``.
+        means (``Array[num_components, data_dim]``): Means of the GMM components.
+        cov_factors (``Array[num_components, data_dim, rank]``): Low-rank covariance matrices of the GMM components.
+        priors (``Array[num_components]``): Mixture weights of the GMM components.
 
     Returns:
-        Array[data_dim]: The denoised prediction `x0` evaluated at `x_t` and `t`.
+        ``Array[data_dim]``: The denoised prediction ``x0`` evaluated at ``x_t`` and ``t``.
     """
     num_components, data_dim, rank = cov_factors.shape
     alpha_t = diffusion_process.alpha(t)

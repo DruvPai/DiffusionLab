@@ -6,8 +6,15 @@ from jax import Array
 class VectorFieldType(enum.Enum):
     """
     Enum representing the type of a vector field.
-    A vector field is a function that takes in x (Array[*data_dims]) and t (Array[])
-    and returns a vector of the same shape as x (Array[*data_dims]).
+    A vector field is a function that takes in ``x_t`` (``Array[*data_dims]``) and ``t`` (``Array[]``)
+    and returns a vector of the same shape as ``x_t`` (``Array[*data_dims]``).
+
+    DiffusionLab supports the following vector field types:
+
+    - ``VectorFieldType.SCORE``: The score of the distribution.
+    - ``VectorFieldType.X0``: The denoised state.
+    - ``VectorFieldType.EPS``: The noise.
+    - ``VectorFieldType.V``: The velocity field.
     """
 
     SCORE = enum.auto()
@@ -30,17 +37,17 @@ def convert_vector_field_type(
     Converts the output of a vector field from one type to another.
 
     Arguments:
-        x (Array[*data_dims]): The input tensor.
-        f_x (Array[*data_dims]): The output of the vector field f evaluated at x.
-        alpha (Array[]): A scalar representing the scale parameter.
-        sigma (Array[]): A scalar representing the noise level parameter.
-        alpha_prime (Array[]): A scalar representing the scale derivative parameter.
-        sigma_prime (Array[]): A scalar representing the noise level derivative parameter.
-        in_type (VectorFieldType): The type of the input vector field (e.g. SCORE, X0, EPS, V).
-        out_type (VectorFieldType): The type of the output vector field.
+        x (``Array[*data_dims]``): The input tensor.
+        f_x (``Array[*data_dims]``): The output of the vector field f evaluated at x.
+        alpha (``Array[]``): A scalar representing the scale parameter.
+        sigma (``Array[]``): A scalar representing the noise level parameter.
+        alpha_prime (``Array[]``): A scalar representing the scale derivative parameter.
+        sigma_prime (``Array[]``): A scalar representing the noise level derivative parameter.
+        in_type (``VectorFieldType``): The type of the input vector field (e.g. ``VectorFieldType.SCORE``, ``VectorFieldType.X0``, ``VectorFieldType.EPS``, ``VectorFieldType.V``).
+        out_type (``VectorFieldType``): The type of the output vector field.
 
     Returns:
-        Array[*data_dims]: The converted output of the vector field
+        ``Array[*data_dims]``: The converted output of the vector field
     """
     """
     Derivation:

@@ -17,17 +17,19 @@ class DiffusionLoss:
     and the target, which depends on the chosen vector field type.
 
     The loss supports different target types:
-    - X0: Learn to predict the original clean data x_0
-    - EPS: Learn to predict the noise component eps
-    - V: Learn to predict the velocity field v
-    - SCORE: Not directly supported (raises ValueError)
+
+    - ``VectorFieldType.X0``: Learn to predict the original clean data x_0
+    - ``VectorFieldType.EPS``: Learn to predict the noise component eps
+    - ``VectorFieldType.V``: Learn to predict the velocity field v
+    - ``VectorFieldType.SCORE``: Not directly supported (raises ValueError)
 
     Attributes:
-        diffusion_process (DiffusionProcess): The diffusion process defining the forward dynamics
-        vector_field_type (VectorFieldType): The type of target to learn to estimate via minimizing the loss function.
-        num_noise_draws_per_sample (int): The number of noise draws per sample to use for the batchwise loss.
-        target (Callable[Array, Array, Array, Array, Array] -> Array): Function that computes the target based on the specified target_type.
-            Signature: (x_t: Array[*data_dims], f_x_t: Array[*data_dims], x_0: Array[*data_dims], eps: Array[*data_dims], t: Array[]) -> Array[*data_dims]
+        diffusion_process (``DiffusionProcess``): The diffusion process defining the forward dynamics
+        vector_field_type (``VectorFieldType``): The type of target to learn to estimate via minimizing the loss function.
+        num_noise_draws_per_sample (``int``): The number of noise draws per sample to use for the batchwise loss.
+        target (``Callable[[Array, Array, Array, Array, Array], Array]``): Function that computes the target based on the specified target_type.
+
+            Signature: ``(x_t: Array[*data_dims], f_x_t: Array[*data_dims], x_0: Array[*data_dims], eps: Array[*data_dims], t: Array[]) -> Array[*data_dims]``
     """
 
     diffusion_process: DiffusionProcess
@@ -77,24 +79,24 @@ class DiffusionLoss:
         """
         Compute the loss given a prediction and inputs/targets.
 
-        This method calculates the mean squared error between the model's prediction (f_x_t)
-        and the target value determined by the target_type.
+        This method calculates the mean squared error between the model's prediction (``f_x_t``)
+        and the target value determined by the target_type (``self.target``).
 
         Args:
-            x_t (Array[*data_dims]): The noised data at time t.
-            f_x_t (Array[*data_dims]): The model's prediction at time t.
-            x_0 (Array[*data_dims]): The original clean data.
-            eps (Array[*data_dims]): The noise used to generate x_t.
-            t (Array[]): The scalar time parameter.
+            x_t (``Array[*data_dims]``): The noised data at time ``t``.
+            f_x_t (``Array[*data_dims]``): The model's prediction at time ``t``.
+            x_0 (``Array[*data_dims]``): The original clean data.
+            eps (``Array[*data_dims]``): The noise used to generate ``x_t``.
+            t (``Array[]``): The scalar time parameter.
 
         Returns:
-            Array[]: The scalar loss value for the given sample.
+            ``Array[]``: The scalar loss value for the given sample.
         """
         squared_residuals = (f_x_t - self.target(x_t, f_x_t, x_0, eps, t)) ** 2
         samplewise_loss = jnp.sum(squared_residuals)
         return samplewise_loss
 
-    def __call__(
+    def loss(
         self,
         key: Array,
         vector_field: Callable[[Array, Array], Array],
@@ -102,25 +104,27 @@ class DiffusionLoss:
         t: Array,
     ) -> Array:
         """
-        Compute the average loss over multiple noise samples for a single data point and time.
+        Compute the average loss over multiple noise draws for a single data point and time.
 
-        This method estimates the expected loss at a given time `t` for a clean data sample `x_0`.
-        It does this by drawing `num_noise_draws_per_sample` noise vectors (`eps`), generating
-        the corresponding noisy samples `x_t` using the `diffusion_process`, predicting the
-        target quantity `f_x_t` using the provided `vector_field` (vmapped internally), and then calculating the
-        `prediction_loss` for each noise sample. The final loss is the average over these samples.
+        This method estimates the expected loss at a given time ``t`` for a clean data sample ``x_0``.
+        It does this by drawing ``num_noise_draws_per_sample`` noise vectors (``eps``), generating
+        the corresponding noisy samples ``x_t`` using the ``diffusion_process``, predicting the
+        target quantity ``f_x_t`` using the provided ``vector_field`` (vmapped internally), and then calculating the
+        ``prediction_loss`` for each noise sample. The final loss is the average over these samples.
 
         Args:
-            key (Array): The PRNG key for noise generation. Shape: [2].
-            vector_field (Callable[[Array, Array], Array]): The vector field function that takes
-                a single noisy data sample `x_t` and its corresponding time `t`, and returns the model's prediction `f_x_t`.
-                Signature: (x_t: Array[*data_dims], t: Array[]) -> Array[*data_dims].
-                This function will be vmapped internally over the batch dimension created by `num_noise_draws_per_sample`.
-            x_0 (Array[*data_dims]): The original clean data sample.
-            t (Array[]): The scalar time parameter.
+            key (``Array``): The PRNG key for noise generation.
+            vector_field (``Callable[[Array, Array], Array]``): The vector field function that takes
+                a single noisy data sample ``x_t`` and its corresponding time ``t``, and returns the model's prediction ``f_x_t``.
+                This function will be vmapped internally over the batch dimension created by ``num_noise_draws_per_sample``.
+
+                Signature: ``(x_t: Array[*data_dims], t: Array[]) -> Array[*data_dims]``.
+
+            x_0 (``Array[*data_dims]``): The original clean data sample.
+            t (``Array[]``): The scalar time parameter.
 
         Returns:
-            Array[]: The scalar loss value, averaged over `num_noise_draws_per_sample` noise instances.
+            ``Array[]``: The scalar loss value, averaged over ``num_noise_draws_per_sample`` noise instances.
         """
         x_0_batch = x_0[None, ...].repeat(self.num_noise_draws_per_sample, axis=0)
         t_batch = t[None].repeat(self.num_noise_draws_per_sample, axis=0)

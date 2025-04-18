@@ -129,7 +129,7 @@ class TestDiffusionLoss:
         expected_loss = loss_instance.prediction_loss(
             x_t_single, f_x_t_single, x_0, eps_single, t
         )
-        actual_loss = loss_instance(call_key, dummy_vector_field, x_0, t)
+        actual_loss = loss_instance.loss(call_key, dummy_vector_field, x_0, t)
         assert_allclose(actual_loss, expected_loss, atol=1e-6)
 
     @pytest.mark.parametrize(
@@ -205,7 +205,7 @@ class TestDiffusionLoss:
         expected_mean_loss = jnp.mean(squared_residuals_batch)  # Mean over noise draws
 
         # --- Call the actual function ---
-        actual_loss = loss_instance(
+        actual_loss = loss_instance.loss(
             call_key, zero_vector_field, x_0, t
         )  # Takes original x_0 and t
 
@@ -234,12 +234,12 @@ class TestDiffusionLoss:
             return jnp.zeros_like(xt)
 
         # Calculate expected loss without JIT
-        expected_loss = loss_instance(call_key, zero_vector_field, x_0, t)
+        expected_loss = loss_instance.loss(call_key, zero_vector_field, x_0, t)
 
         # JIT the call method. We need to make `vector_field` static.
         # Note: Jitting loss_instance directly might work if the vector_field is simple enough or hashable,
         # but using partial and static_argnums is safer.
-        jitted_loss_call = jax.jit(loss_instance.__call__, static_argnums=(1,))
+        jitted_loss_call = jax.jit(loss_instance.loss, static_argnums=(1,))
 
         # Run JITted version
         actual_loss = jitted_loss_call(call_key, zero_vector_field, x_0, t)
@@ -290,7 +290,7 @@ class TestDiffusionLoss:
 
         # --- Calculate expected loss (using vmap on the non-jitted function) ---
         # Define the function signature for vmap
-        call_fn = loss_instance.__call__
+        call_fn = loss_instance.loss
 
         # Vmap the scalar function to get expected batch output
         vmapped_call_expected = jax.vmap(
