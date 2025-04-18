@@ -14,4 +14,6 @@ wheels/
 
 # Sphinx
 docs/_build/
+docs/index.md
+docs/api.md
 docs/llms.txt

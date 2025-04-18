@@ -13,7 +13,7 @@
 
 TL;DR: DiffusionLab is a laboratory for quickly and easily experimenting with diffusion models.
 - DiffusionLab IS:
-  - A lightweight and flexible set of Jax APIs for smaller-scale diffusion model training and sampling.
+  - A lightweight and flexible set of JAX APIs for smaller-scale diffusion model training and sampling.
   - An implementation of the mathematical foundations of diffusion models. 
 - DiffusionLab IS NOT:
   - A replacement for HuggingFace Diffusers. 
@@ -86,7 +86,7 @@ print(f"Min distance to ground truth samples from DDIM samples using ground trut
 
 DiffusionLab versions < 3.0 use a PyTorch backbone. Here is a permalink to the [GitHub pages](https://github.com/DruvPai/DiffusionLab/tree/1543db3453c4cc687c724eb0e01f63c109e4465a) and [llms.txt](https://raw.githubusercontent.com/DruvPai/DiffusionLab/1543db3453c4cc687c724eb0e01f63c109e4465a/llms.txt) for the old version.
 
-DiffusionLab versions >= 3.0 use a Jax backbone.
+DiffusionLab versions >= 3.0 use a JAX backbone.
 
 
 ## Citation Information

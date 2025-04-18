@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Iterable, Tuple, cast
 
 import jax
@@ -8,23 +9,23 @@ from diffusionlab.distributions.base import Distribution
 from diffusionlab.vector_fields import VectorFieldType, convert_vector_field_type
 
 
+@dataclass(frozen=True)
 class EmpiricalDistribution(Distribution):
     """
     An empirical distribution, i.e., the uniform distribution over a dataset.
     The probability measure is defined as:
 
-    mu(A) = (1/N) * sum_{i=1}^{num_samples} delta(x_i in A)
+    ``μ(A) = (1/N) * sum_{i=1}^{num_samples} delta(x_i in A)``
 
-    where x_i is the ith data point in the dataset, and N is the number of data points.
+    where ``x_i`` is the ith data point in the dataset, and ``N`` is the number of data points.
 
-    This class provides methods for sampling from the empirical distribution and computing various
-    vector fields (score, x0, eps, v) related to the distribution under a
-    given diffusion process.
+    This class provides methods for sampling from the empirical distribution and computing various vector fields (``VectorFieldType.SCORE``, ``VectorFieldType.X0``, ``VectorFieldType.EPS``, ``VectorFieldType.V``) related to the distribution under a given diffusion process.
 
     Attributes:
-        dist_params (Dict[str, Array]): Dictionary containing distribution parameters (currently unused).
-        dist_hparams (Dict[str, Any]): Dictionary for storing hyperparameters.
-            - labeled_data (Iterable[Tuple[Array, Array]] | Iterable[Tuple[Array, None]]): An iterable of data whose elements (samples) are tuples of (data batch, label batch). The label batch can be None if the data is unlabelled.
+        dist_params (``Dict[str, Array]``): Dictionary containing distribution parameters (currently unused).
+        dist_hparams (``Dict[str, Any]``): Dictionary for storing hyperparameters. It may contain the following keys:
+
+            - ``labeled_data`` (``Iterable[Tuple[Array, Array]] | Iterable[Tuple[Array, None]]``): An iterable of data whose elements (samples) are tuples of (data batch, label batch). The label batch can be ``None`` if the data is unlabelled.
     """
 
     def __init__(
@@ -40,15 +41,15 @@ class EmpiricalDistribution(Distribution):
     ) -> Tuple[Array, Array] | Tuple[Array, None]:
         """
         Sample from the empirical distribution using reservoir sampling.
-        Assumes all batches in `labeled_data` are consistent: either all have labels (Array)
-        or none have labels (None).
+        Assumes all batches in ``labeled_data`` are consistent: either all have labels (``Array``)
+        or none have labels (``None``).
 
         Args:
-            key (Array): The Jax PRNG key to use for sampling.
-            num_samples (int): The number of samples to draw.
+            key (``Array``): The JAX PRNG key to use for sampling.
+            num_samples (``int``): The number of samples to draw.
 
         Returns:
-            Tuple[Array[num_samples, *data_dims], Array[num_samples, *label_dims]] | Tuple[Array[num_samples, *data_dims], None]: A tuple containing the samples and corresponding labels (stacked into an Array), or samples and None.
+            ``Tuple[Array[num_samples, *data_dims], Array[num_samples, *label_dims]] | Tuple[Array[num_samples, *data_dims], None]``: A tuple ``(samples, labels)`` containing the samples and corresponding labels (stacked into an ``Array``), or ``(samples, None)`` if the data is unlabelled.
         """
         data_iterator = iter(self.dist_hparams["labeled_data"])  # Get an iterator
 
@@ -120,16 +121,16 @@ class EmpiricalDistribution(Distribution):
         diffusion_process: DiffusionProcess,
     ) -> Array:
         """
-        Computes the score function (∇_x log p_t(x)) of the empirical distribution at time t,
-        given the noisy state x_t and the diffusion process.
+        Computes the score function (``∇_x log p_t(x)``) of the empirical distribution at time ``t``,
+        given the noisy state ``x_t`` and the diffusion process.
 
         Args:
-            x_t (Array[*data_dims]): The noisy state tensor at time t.
-            t (Array[]): The time tensor.
-            diffusion_process (DiffusionProcess): The diffusion process.
+            x_t (``Array[*data_dims]``): The noisy state tensor at time ``t``.
+            t (``Array[]``): The time tensor.
+            diffusion_process (``DiffusionProcess``): The diffusion process.
 
         Returns:
-            Array[*data_dims]: The score of the empirical distribution at (x_t, t).
+            ``Array[*data_dims]``: The score of the empirical distribution at ``(x_t, t)``.
         """
         x0_x_t = self.x0(x_t, t, diffusion_process)
         alpha_t = diffusion_process.alpha(t)
@@ -155,19 +156,19 @@ class EmpiricalDistribution(Distribution):
         diffusion_process: DiffusionProcess,
     ) -> Array:
         """
-        Computes the denoiser E[x_0 | x_t] for an empirical distribution w.r.t. a given diffusion process.
+        Computes the denoiser ``E[x_0 | x_t]`` for an empirical distribution w.r.t. a given diffusion process.
 
         This method computes the denoiser by performing a weighted average of the
-        dataset samples, where the weights are determined by the likelihood of x_t
+        dataset samples, where the weights are determined by the likelihood of ``x_t``
         given each sample.
 
         Arguments:
-            x_t (Array[*data_dims]): The input tensor.
-            t (Array[]): The time tensor.
-            diffusion_process (DiffusionProcess): The diffusion process.
+            x_t (``Array[*data_dims]``): The input tensor.
+            t (``Array[]``): The time tensor.
+            diffusion_process (``DiffusionProcess``): The diffusion process.
 
         Returns:
-            Array[*data_dims]: The prediction of x_0.
+            ``Array[*data_dims]``: The prediction of ``x_0``.
         """
         data = self.dist_hparams["labeled_data"]
 
@@ -197,15 +198,15 @@ class EmpiricalDistribution(Distribution):
         diffusion_process: DiffusionProcess,
     ) -> Array:
         """
-        Computes the noise field eps(x_t, t) for an empirical distribution w.r.t. a given diffusion process.
+        Computes the noise field ``eps(x_t, t)`` for an empirical distribution w.r.t. a given diffusion process.
 
         Args:
-            x_t (Array[*data_dims]): The input tensor.
-            t (Array[]): The time tensor.
-            diffusion_process (DiffusionProcess): The diffusion process.
+            x_t (``Array[*data_dims]``): The input tensor.
+            t (``Array[]``): The time tensor.
+            diffusion_process (``DiffusionProcess``): The diffusion process.
 
         Returns:
-            Array[*data_dims]: The noise field at (x_t, t).
+            ``Array[*data_dims]``: The noise field at ``(x_t, t)``.
         """
         x0_x_t = self.x0(x_t, t, diffusion_process)
         alpha_t = diffusion_process.alpha(t)
@@ -231,15 +232,15 @@ class EmpiricalDistribution(Distribution):
         diffusion_process: DiffusionProcess,
     ) -> Array:
         """
-        Computes the velocity field v(x_t, t) for an empirical distribution w.r.t. a given diffusion process.
+        Computes the velocity field ``v(x_t, t)`` for an empirical distribution w.r.t. a given diffusion process.
 
         Args:
-            x_t (Array[*data_dims]): The input tensor.
-            t (Array[]): The time tensor.
-            diffusion_process (DiffusionProcess): The diffusion process.
+            x_t (``Array[*data_dims]``): The input tensor.
+            t (``Array[]``): The time tensor.
+            diffusion_process (``DiffusionProcess``): The diffusion process.
 
         Returns:
-            Array[*data_dims]: The velocity field at (x_t, t).
+            ``Array[*data_dims]``: The velocity field at ``(x_t, t)``.
         """
         x0_x_t = self.x0(x_t, t, diffusion_process)
         alpha_t = diffusion_process.alpha(t)

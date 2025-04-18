@@ -8,13 +8,13 @@ def _logdeth(cov: Array) -> Array:
     """
     Computes the log determinant of a positive semi-definite (PSD) matrix.
 
-    Uses `eigh` for numerical stability with symmetric matrices like covariance matrices.
+    Uses ``eigh`` for numerical stability with symmetric matrices like covariance matrices.
 
     Args:
-        cov (Array[dim, dim]): The input PSD matrix (e.g., a covariance matrix).
+        cov (``Array[dim, dim]``): The input PSD matrix (e.g., a covariance matrix).
 
     Returns:
-        Array[]: The log determinant of the matrix (scalar).
+        ``Array[]``: The log determinant of the matrix (scalar).
     """
     eigvals = jnp.linalg.eigvalsh(cov)
     return jnp.sum(jnp.log(eigvals))
@@ -28,11 +28,11 @@ def _lstsq(A: Array, y: Array) -> Array:
     Equivalent to computing A^+ y where A^+ is the Moore-Penrose pseudoinverse.
 
     Args:
-        A (Array[out_dim, in_dim]): The coefficient matrix.
-        y (Array[out_dim]): The dependent variable values.
+        A (``Array[out_dim, in_dim]``): The coefficient matrix.
+        y (``Array[out_dim]``): The dependent variable values.
 
     Returns:
-        Array[in_dim]: The least-squares solution `x`.
+        ``Array[in_dim]``: The least-squares solution ``x``.
     """
     eps = cast(float, jnp.finfo(A.dtype).eps)
     x = jnp.linalg.lstsq(A, y, rcond=eps)[0]
@@ -50,13 +50,14 @@ def create_gmm_vector_field_fns(
     Factory to create eps, score, and v functions from a given x0 function.
 
     Args:
-        x0_fn: The specific x0 calculation function (e.g., gmm_x0, iso_gmm_x0).
-               It must accept (x_t, t, diffusion_process, means, specific_cov, priors).
+        x0_fn: The specific x0 calculation function (e.g., ``gmm_x0``, ``iso_gmm_x0``).
+               It must accept ``(x_t, t, diffusion_process, means, specific_cov, priors)``.
 
     Returns:
-        A tuple containing the generated (eps_fn, score_fn, v_fn).
-        These functions will have the same signature as x0_fn, accepting
-        (x_t, t, diffusion_process, means, specific_cov, priors).
+        ``Tuple[Callable[[Array, Array, DiffusionProcess, Array, Array, Array], Array], Callable[[Array, Array, DiffusionProcess, Array, Array, Array], Array], Callable[[Array, Array, DiffusionProcess, Array, Array, Array], Array]]``:
+        A tuple containing the generated ``(eps_fn, score_fn, v_fn)``.
+        These functions will have the same signature as ``x0_fn``, accepting
+        ``(x_t, t, diffusion_process, means, specific_cov, priors)``.
     """
 
     def common_wrapper(
