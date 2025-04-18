@@ -1,7 +1,7 @@
 
 <div style="text-align:center;">
 
-![DiffusionLab Logo](docs/diffusionlab_logo.svg)
+![DiffusionLab Logo](https://raw.githubusercontent.com/DruvPai/DiffusionLab/refs/heads/main/docs/diffusionlab_logo.svg)
 
 [Documentation](https://druvpai.github.io/DiffusionLab) • `pip install diffusionlab` • [`llms.txt`](https://raw.githubusercontent.com/DruvPai/DiffusionLab/refs/heads/gh-pages/llms.txt)
 

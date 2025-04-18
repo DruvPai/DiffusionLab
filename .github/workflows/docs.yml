@@ -23,21 +23,19 @@ jobs:
       run: uv python install
         
     - name: Install the project
-      run: uv sync --all-extras --dev
+      run: uv sync --all-extras --dev --docs
 
-    - name: Configure Git Credentials
-      run: |
-        git config user.name github-actions[bot]
-        git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-
-    - name: Generate docs files
+    - name: Generate docs
       run: |
         cd docs
         uv run generate_docs.py
+        uv run make html
         cd ..
-    
-    - name: Build docs
-      run: uv run mkdocs build 
 
     - name: Deploy docs
-      run: uv run mkdocs gh-deploy --force
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs/_build/html
+        publish_branch: docs
+        force_orphan: true

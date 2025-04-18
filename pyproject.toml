@@ -14,11 +14,9 @@ dependencies = [
 
 [project.optional-dependencies]
 docs = [
-    "mkdocs>=1.6.1",
-    "mkdocs-llmstxt>=0.1.0",
-    "mkdocs-material>=9.6.8",
-    "mkdocstrings>=0.29.0",
-    "mkdocstrings-python>=1.16.5",
+    "furo>=2024.8.6",
+    "myst-parser>=4.0.1",
+    "sphinx>=8.2.3",
 ]
 dev = [
     "pytest>=8.3.5",
