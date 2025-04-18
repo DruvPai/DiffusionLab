@@ -23,7 +23,7 @@ jobs:
       run: uv python install
         
     - name: Install the project
-      run: uv sync --all-extras --dev --docs
+      run: uv sync --all-extras
 
     - name: Generate docs
       run: |
