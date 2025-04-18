@@ -11,3 +11,7 @@ wheels/
 
 # Ruff
 .ruff_cache
+
+# Sphinx
+docs/_build/
+docs/llms.txt

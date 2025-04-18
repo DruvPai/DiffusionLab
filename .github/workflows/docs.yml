@@ -25,17 +25,26 @@ jobs:
     - name: Install the project
       run: uv sync --all-extras
 
-    - name: Generate docs
+    - name: Configure Git Credentials
+      run: |
+        git config user.name github-actions[bot]
+        git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+    - name: Generate docs files
       run: |
         cd docs
         uv run generate_docs.py
         uv run make html
+        mv llms.txt _build/html/
         cd ..
 
-    - name: Deploy docs
+    - name: Deploy docs to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./docs/_build/html
         publish_branch: gh-pages
         force_orphan: true
+        user_name: 'github-actions[bot]'
+        user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+        commit_message: 'Deploy documentation'
