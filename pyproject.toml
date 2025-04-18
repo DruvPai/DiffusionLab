@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "diffusionlab"
-version = "3.0.1"
+version = "3.0.2"
 description = "Easy no-frills implementations of common abstractions for diffusion models."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "jax>=0.5.3",
+    "jax>=0.6.0",
 ]
 
 [project.optional-dependencies]
