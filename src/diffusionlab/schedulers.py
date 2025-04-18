@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Dict
 from jax import Array, numpy as jnp
 
 
@@ -49,7 +49,7 @@ class UniformScheduler(Scheduler):
 
         Args:
             **ts_hparams (``Dict[str, Any]``): Keyword arguments must contain
-            
+
                 - ``t_min`` (``float``): The minimum time value, typically close to 0.
                 - ``t_max`` (``float``): The maximum time value, typically close to 1.
                 - ``num_steps`` (``int``): The number of diffusion steps. The function will generate ``num_steps + 1`` time points.
