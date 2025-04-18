@@ -76,9 +76,10 @@ class VarianceExplodingProcess(DiffusionProcess):
     - sigma(t) = Provided by the user
 
     Attributes:
-        Inherits `alpha`, `sigma`, `alpha_prime`, `sigma_prime` from `DiffusionProcess`.
-        `alpha` is fixed to `lambda t: jnp.ones_like(t)`.
-        `alpha_prime` is fixed to `lambda t: jnp.zeros_like(t)`.
+        alpha (Callable[[Array], Array]): Function mapping scalar time `t` (Array[]) -> scalar signal coefficient alpha(t) (Array[]). Set to 1.
+        sigma (Callable[[Array], Array]): Function mapping scalar time `t` (Array[]) -> scalar noise coefficient sigma(t) (Array[]). Provided by the user.
+        alpha_prime (Callable[[Array], Array]): Derivative of alpha w.r.t. scalar time `t`. Maps `t` (Array[]) -> alpha'(t) (Array[]). Set to 0.
+        sigma_prime (Callable[[Array], Array]): Derivative of sigma w.r.t. scalar time `t`. Maps `t` (Array[]) -> sigma'(t) (Array[]). Provided by the user.
     """
 
     def __init__(self, sigma: Callable[[Array], Array]):
@@ -107,8 +108,10 @@ class VariancePreservingProcess(DiffusionProcess):
     Forward process: `x_t = sqrt(1 - t²) * x_0 + t * eps`.
 
     Attributes:
-        Inherits `alpha`, `sigma`, `alpha_prime`, `sigma_prime` from `DiffusionProcess`.
-        `alpha` and `sigma` are set according to the VP schedule.
+        alpha (Callable[[Array], Array]): Function mapping scalar time `t` (Array[]) -> scalar signal coefficient alpha(t) (Array[]). Set to sqrt(1 - t²).
+        sigma (Callable[[Array], Array]): Function mapping scalar time `t` (Array[]) -> scalar noise coefficient sigma(t) (Array[]). Set to t.
+        alpha_prime (Callable[[Array], Array]): Derivative of alpha w.r.t. scalar time `t`. Maps `t` (Array[]) -> alpha'(t) (Array[]). Set to -t / sqrt(1 - t²).
+        sigma_prime (Callable[[Array], Array]): Derivative of sigma w.r.t. scalar time `t`. Maps `t` (Array[]) -> sigma'(t) (Array[]). Set to 1.
     """
 
     def __init__(self):
@@ -135,8 +138,10 @@ class FlowMatchingProcess(DiffusionProcess):
     Forward process: `x_t = (1 - t) * x_0 + t * eps`.
 
     Attributes:
-        Inherits `alpha`, `sigma`, `alpha_prime`, `sigma_prime` from `DiffusionProcess`.
-        `alpha` and `sigma` are set to `1-t` and `t` respectively.
+        alpha (Callable[[Array], Array]): Function mapping scalar time `t` (Array[]) -> scalar signal coefficient alpha(t) (Array[]). Set to 1 - t.
+        sigma (Callable[[Array], Array]): Function mapping scalar time `t` (Array[]) -> scalar noise coefficient sigma(t) (Array[]). Set to t.
+        alpha_prime (Callable[[Array], Array]): Derivative of alpha w.r.t. scalar time `t`. Maps `t` (Array[]) -> alpha'(t) (Array[]). Set to -1.
+        sigma_prime (Callable[[Array], Array]): Derivative of sigma w.r.t. scalar time `t`. Maps `t` (Array[]) -> sigma'(t) (Array[]). Set to 1.
     """
 
     def __init__(self):
