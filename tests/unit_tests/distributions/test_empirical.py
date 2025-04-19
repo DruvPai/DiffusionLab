@@ -33,41 +33,87 @@ class TestEmpiricalDistribution:
         assert dist.dist_hparams["labeled_data"] is labeled_data
 
     # --- Sampling Tests ---
-    def test_sample_unlabeled_correct_number(self):
-        """Test sampling the correct number of unlabeled samples."""
-        # Define data inline
-        unlabeled_data: Iterable[Tuple[Array, None]] = [
-            (jnp.array([[1.0], [2.0], [3.0]]), None),  # Data dim (1,)
-            (jnp.array([[4.0], [5.0]]), None),
-        ]
-        data_dim = (1,)  # Define locally
-        dist = EmpiricalDistribution(unlabeled_data)
-        key = jax.random.key(0)
-        num_samples = 3
-        samples, labels = dist.sample(key, num_samples)
-        assert samples.shape == (num_samples,) + data_dim
-        assert labels is None
-
-    def test_sample_labeled_correct_number_and_type(self):
-        """Test sampling the correct number and type of labeled samples."""
-        # Define data inline
-        labeled_data: Iterable[Tuple[Array, Array]] = [
+    @pytest.mark.parametrize(
+        "test_id, data, num_samples_to_request, expected_data_shape, expected_label_shape, expect_labels",
+        [
             (
-                jnp.array([[1.0], [2.0]]),
-                jnp.array([0, 1]),
-            ),  # Data dim (1,), Label dim ()
-            (jnp.array([[3.0], [4.0], [5.0]]), jnp.array([0, 1, 0])),
-        ]
-        data_dim = (1,)  # Define locally
-        label_dim = ()  # Define locally
-        dist = EmpiricalDistribution(labeled_data)
-        key = jax.random.key(1)
-        num_samples = 4
-        samples, labels = dist.sample(key, num_samples)
-        assert samples.shape == (num_samples,) + data_dim
-        assert labels is not None
-        assert labels.shape == (num_samples,) + label_dim
-        assert jnp.issubdtype(labels.dtype, jnp.integer)  # Check labels are integers
+                "unlabeled_1d",
+                [
+                    (jnp.array([[1.0], [2.0], [3.0]]), None),
+                    (jnp.array([[4.0], [5.0]]), None),
+                ],
+                3,
+                (1,),
+                None,
+                False,
+            ),
+            (
+                "labeled_1d",
+                [
+                    (jnp.array([[1.0], [2.0]]), jnp.array([0, 1])),
+                    (jnp.array([[3.0], [4.0], [5.0]]), jnp.array([0, 1, 0])),
+                ],
+                4,
+                (1,),
+                (),
+                True,
+            ),
+            (
+                "unlabeled_2d",
+                [
+                    (jnp.array([[1.0, 1.0], [2.0, 2.0]]), None),
+                    (jnp.array([[3.0, 3.0]]), None),
+                ],
+                2,
+                (2,),
+                None,
+                False,
+            ),
+            (
+                "unlabeled_high_dim",
+                [
+                    (jnp.ones((2, 2, 3, 1)), None),
+                    (jnp.zeros((1, 2, 3, 1)), None),
+                ],
+                2,
+                (2, 3, 1),
+                None,
+                False,
+            ),
+            (
+                "labeled_high_dim",
+                [
+                    (jnp.ones((2, 2, 3, 1)), jnp.arange(2)),
+                    (jnp.zeros((1, 2, 3, 1)), jnp.array([0])),
+                ],
+                2,
+                (2, 3, 1),
+                (),
+                True,
+            ),
+        ],
+    )
+    def test_sample_shapes(
+        self,
+        test_id,
+        data,
+        num_samples_to_request,
+        expected_data_shape,
+        expected_label_shape,
+        expect_labels,
+    ):
+        """Test sampling output shapes for various data dimensions and labels."""
+        dist = EmpiricalDistribution(data)
+        key = jax.random.key(hash(test_id))  # Use test_id for key uniqueness
+        samples, labels = dist.sample(key, num_samples_to_request)
+
+        assert samples.shape == (num_samples_to_request,) + expected_data_shape
+        if expect_labels:
+            assert labels is not None
+            assert labels.shape == (num_samples_to_request,) + expected_label_shape
+            assert jnp.issubdtype(labels.dtype, jnp.integer)
+        else:
+            assert labels is None
 
     def test_sample_request_more_than_available_raises_error(self):
         """Test that requesting more samples than available raises a ValueError."""
@@ -96,14 +142,22 @@ class TestEmpiricalDistribution:
         with pytest.raises(ValueError, match="has inconsistent shape"):
             dist.sample(key, 1)
 
-        malformatted_data: Iterable[Tuple[Array, Array]] = [
-            (jnp.array([[1.0], [2.0], [3.0]]), [0, 1, 0]),
-            (jnp.array([[4.0], [5.0]]), [0, 1]),
+        # Test case 2: Inconsistent data dimensions
+        malformatted_data_inconsistent_dims: Iterable[Tuple[Array, Array]] = [
+            (jnp.array([[1.0], [2.0], [3.0]]), jnp.array([0, 1, 0])),  # Shape (3, 1)
+            (
+                jnp.array([[4.0, 4.0], [5.0, 5.0]]),
+                jnp.array([0, 1]),
+            ),  # Shape (2, 2) - Inconsistent dim
         ]
-        dist = EmpiricalDistribution(malformatted_data)
+        total_malformatted_samples = 3 + 2  # Total number of samples
+        dist = EmpiricalDistribution(malformatted_data_inconsistent_dims)
         key = jax.random.key(2)
-        with pytest.raises(ValueError, match="has inconsistent shape"):
-            dist.sample(key, 1)
+        # This should fail when trying to concatenate arrays with different shapes[1:]
+        # Sample *all* elements to force concatenation attempt
+        with pytest.raises(ValueError):
+            # Match message removed as the exact JAX error might vary
+            dist.sample(key, total_malformatted_samples)
 
     def test_sample_reproducibility(self):
         """Test that sampling is reproducible with the same PRNG key."""
@@ -157,19 +211,69 @@ class TestEmpiricalDistribution:
         assert samples.shape == (num_samples,) + data_dim
         assert labels is None
 
-    # --- Vector Field Tests ---
+    def test_sample_high_dim(self):
+        """Test sampling with high-dimensional data (e.g., images)."""
+        # Define data inline - Ensure consistent shapes
+        data_shape = (2, 3, 1)  # Define locally
+        high_dim_data: Iterable[Tuple[Array, None]] = [
+            (jnp.ones((2,) + data_shape), None),  # Shape (2, 2, 3, 1)
+            (jnp.zeros((1,) + data_shape), None),  # Shape (1, 2, 3, 1)
+        ]
+        dist = EmpiricalDistribution(high_dim_data)
+        key = jax.random.key(7)
+        num_samples = 2  # Sample more than one to test batching
+        samples, labels = dist.sample(key, num_samples)
+        assert samples.shape == (num_samples,) + data_shape
+        assert labels is None
 
-    @pytest.mark.parametrize("t_val", [0.1, 0.5, 0.9])
-    def test_x0_shape(self, t_val):
-        """Test the shape of the x0 prediction."""
-        # Define data and process inline
-        simple_data = [(jnp.array([[0.0], [10.0]]), None)]  # Two points: 0 and 10
-        dist = EmpiricalDistribution(simple_data)
-        process = FlowMatchingProcess()  # Use FlowMatchingProcess
-        x_t = jnp.array([1.0])  # Example noisy point, shape (1,)
+    # --- Vector Field Tests ---
+    @pytest.mark.parametrize(
+        "test_id, data, x_t_shape, t_val",
+        [
+            (
+                "1d",
+                [(jnp.array([[0.0], [10.0]]), None)],
+                (1,),
+                0.5,  # Test one t value, shape is independent
+            ),
+            (
+                "2d",
+                [
+                    (jnp.array([[1.0, 1.0], [2.0, 2.0]]), None),
+                    (jnp.array([[3.0, 3.0]]), None),
+                ],
+                (2,),
+                0.5,
+            ),
+            (
+                "high_dim",
+                [
+                    (jnp.ones((2, 2, 3, 1)), None),
+                    (jnp.zeros((1, 2, 3, 1)), None),
+                ],
+                (2, 3, 1),
+                0.5,
+            ),
+        ],
+    )
+    def test_vector_field_shapes(self, test_id, data, x_t_shape, t_val):
+        """Test the shapes of x0, score, eps, and v predictions."""
+        dist = EmpiricalDistribution(data)
+        process = FlowMatchingProcess()
+        # Create a dummy x_t with the correct shape
+        x_t = jnp.ones(x_t_shape)
         t = jnp.array(t_val)
+
+        # Test shapes of all relevant fields
         x0_hat = dist.x0(x_t, t, process)
-        assert x0_hat.shape == x_t.shape
+        score = dist.score(x_t, t, process)
+        eps = dist.eps(x_t, t, process)
+        v = dist.v(x_t, t, process)
+
+        assert x0_hat.shape == x_t_shape, f"x0 shape mismatch in {test_id}"
+        assert score.shape == x_t_shape, f"score shape mismatch in {test_id}"
+        assert eps.shape == x_t_shape, f"eps shape mismatch in {test_id}"
+        assert v.shape == x_t_shape, f"v shape mismatch in {test_id}"
 
     def test_x0_simple_case_t_near_0(self):
         """Test x0 prediction when t is close to 0."""
@@ -267,3 +371,30 @@ class TestEmpiricalDistribution:
         assert score.shape == x_t.shape
         assert eps.shape == x_t.shape
         assert v.shape == x_t.shape
+
+    def test_vector_fields_high_dim_shape(self):
+        """Test shapes of all vector fields with high-dimensional data."""
+        # Define data and process inline - Ensure consistent shapes
+        data_shape = (2, 3, 1)  # Define locally
+        high_dim_data: Iterable[Tuple[Array, None]] = [
+            (jnp.ones((2,) + data_shape), None),  # Shape (2, 2, 3, 1)
+            (jnp.zeros((1,) + data_shape), None),  # Shape (1, 2, 3, 1)
+        ]
+        dist = EmpiricalDistribution(high_dim_data)
+        process = FlowMatchingProcess()  # Use FlowMatchingProcess
+        x_t = jnp.ones(data_shape)  # Shape (2, 3, 1)
+        t = jnp.array(0.5)
+
+        x0_hat = dist.x0(x_t, t, process)
+        score = dist.score(x_t, t, process)
+        eps = dist.eps(x_t, t, process)
+        v = dist.v(x_t, t, process)
+
+        assert x0_hat.shape == x_t.shape
+        assert score.shape == x_t.shape
+        assert eps.shape == x_t.shape
+        assert v.shape == x_t.shape
+        assert x0_hat.shape == data_shape  # Explicit check
+        assert score.shape == data_shape  # Explicit check
+        assert eps.shape == data_shape  # Explicit check
+        assert v.shape == data_shape  # Explicit check

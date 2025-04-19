@@ -183,10 +183,12 @@ class EmpiricalDistribution(Distribution):
             )
             exp_negative_dists = jnp.exp(-squared_dists / (2 * sigma_t**2))
             softmax_denom += jnp.sum(exp_negative_dists)
-            x0_hat += jnp.sum(exp_negative_dists[:, None] * X_batch, axis=0)
+            x0_hat += jnp.sum(
+                jax.vmap(lambda xi, ei: xi * ei)(X_batch, exp_negative_dists),
+                axis=0,
+            )
 
         eps = cast(float, jnp.finfo(softmax_denom.dtype).eps)
-        jax.debug.print("softmax_denom: {x}", x=softmax_denom)
         softmax_denom = jnp.maximum(softmax_denom, eps)
         x0_hat = x0_hat / softmax_denom
         return x0_hat
