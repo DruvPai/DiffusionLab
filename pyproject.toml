@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "diffusionlab"
-version = "3.0.3"
+version = "3.0.4"
 description = "Easy no-frills implementations of common abstractions for diffusion models."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -19,6 +19,7 @@ docs = [
     "sphinx>=8.2.3",
 ]
 dev = [
+    "matplotlib>=3.10.1",
     "pytest>=8.3.5",
     "pytest-cov>=6.0.0",
     "ruff>=0.11.0",

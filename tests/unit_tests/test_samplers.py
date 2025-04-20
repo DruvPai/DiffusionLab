@@ -133,7 +133,7 @@ class TestEulerMaruyamaSampler:
     x_init = jax.random.normal(key, data_shape)  # Shape: (2, 2)
     zs = jax.random.normal(key, (num_steps,) + data_shape)  # Shape: (4, 2, 2)
     # Use non-uniform timesteps to catch potential bugs
-    ts = jnp.array([1.0, 0.7, 0.5, 0.2, 0.0])  # Shape: (5,)
+    ts = jnp.array([0.99, 0.7, 0.5, 0.2, 0.01])  # Shape: (5,)
     idx = 1  # Corresponds to t=0.7 -> t1=0.5
 
     @pytest.mark.parametrize("use_stochastic", [False, True])

@@ -1,6 +1,7 @@
 import pytest
 import jax
 import jax.numpy as jnp
+import scipy
 
 # Corrected imports based on file structure
 from diffusionlab.distributions.gmm.gmm import GMM, gmm_x0
@@ -8,8 +9,9 @@ from diffusionlab.distributions.gmm.iso_gmm import IsoGMM, iso_gmm_x0
 from diffusionlab.distributions.gmm.iso_hom_gmm import IsoHomGMM, iso_hom_gmm_x0
 from diffusionlab.distributions.gmm.low_rank_gmm import LowRankGMM, low_rank_gmm_x0
 from diffusionlab.distributions.gmm.utils import (
-    _logdeth,
+    _logdet_psd,
     _lstsq,
+    _sqrt_psd,
     create_gmm_vector_field_fns,
 )
 from diffusionlab.dynamics import VariancePreservingProcess
@@ -475,23 +477,57 @@ class TestLowRankGMM:
 
 
 class TestGMMUtils:
-    def test_logdeth(self):
+    def test_logdet_psd(self):
         # Test with identity matrix
         mat_id = jnp.eye(3)
-        logdet_id = _logdeth(mat_id)
+        logdet_id = _logdet_psd(mat_id)
         assert jnp.isclose(logdet_id, 0.0)
 
         # Test with a diagonal matrix
         mat_diag = jnp.diag(jnp.array([2.0, 3.0, 0.5]))
-        logdet_diag = _logdeth(mat_diag)
+        logdet_diag = _logdet_psd(mat_diag)
         expected_logdet_diag = jnp.log(2.0 * 3.0 * 0.5)
         assert jnp.allclose(logdet_diag, expected_logdet_diag)
 
         # Test with a known PSD matrix
         mat_psd = jnp.array([[2.0, 1.0], [1.0, 2.0]])  # Eigvals 1, 3; det = 3
-        logdet_psd = _logdeth(mat_psd)
+        logdet_psd = _logdet_psd(mat_psd)
         expected_logdet_psd = jnp.log(3.0)
         assert jnp.allclose(logdet_psd, expected_logdet_psd)
+
+    def test_sqrt_psd(self):
+        # Test with identity matrix
+        mat_id = jnp.eye(3)
+        sqrt_id = _sqrt_psd(mat_id)
+        assert jnp.allclose(sqrt_id @ sqrt_id, mat_id)
+        assert jnp.allclose(sqrt_id, mat_id)  # sqrt(I) is I
+
+        # Test with a diagonal matrix
+        diag_vals = jnp.array([4.0, 9.0, 0.25])
+        mat_diag = jnp.diag(diag_vals)
+        sqrt_diag = _sqrt_psd(mat_diag)
+        expected_sqrt_diag = jnp.diag(jnp.sqrt(diag_vals))
+        assert jnp.allclose(sqrt_diag @ sqrt_diag, mat_diag)
+        assert jnp.allclose(sqrt_diag, expected_sqrt_diag)
+
+        # Test with a known PSD matrix
+        # A = [[2, 1], [1, 2]], Eigvals: 3, 1
+        # Eigvecs: [1, 1]/sqrt(2), [1, -1]/sqrt(2) (normalized)
+        # V = [[1/sqrt(2), 1/sqrt(2)], [1/sqrt(2), -1/sqrt(2)]]
+        # D = [[3, 0], [0, 1]]
+        # sqrt(D) = [[sqrt(3), 0], [0, 1]]
+        # sqrt(A) = V @ sqrt(D) @ V.T
+        mat_psd = jnp.array([[2.0, 1.0], [1.0, 2.0]])
+        sqrt_psd_val = _sqrt_psd(mat_psd)
+        # Check S @ S = A
+        assert jnp.allclose(sqrt_psd_val @ sqrt_psd_val, mat_psd, atol=1e-6)
+        # Check symmetry
+        assert jnp.allclose(sqrt_psd_val, sqrt_psd_val.T, atol=1e-7)
+        # Optional: Check against known analytical result if easily calculable
+        # Using scipy.linalg.sqrtm for comparison (not strictly necessary but good check)
+        # import scipy.linalg
+        expected_sqrt_psd = scipy.linalg.sqrtm(mat_psd)
+        assert jnp.allclose(sqrt_psd_val, expected_sqrt_psd, atol=1e-6)
 
     def test_lstsq(self):
         # Test exact solution

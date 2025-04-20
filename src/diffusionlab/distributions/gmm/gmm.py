@@ -4,8 +4,9 @@ from jax import numpy as jnp, Array
 import jax
 from diffusionlab.distributions.base import Distribution
 from diffusionlab.distributions.gmm.utils import (
-    _logdeth,
+    _logdet_psd,
     _lstsq,
+    _sqrt_psd,
     create_gmm_vector_field_fns,
 )
 from diffusionlab.dynamics import DiffusionProcess
@@ -72,39 +73,29 @@ class GMM(Distribution):
         num_components, data_dim = self.dist_params["means"].shape
         key, key_cat, key_norm = jax.random.split(key, 3)
 
-        # Sample component indices
         component_indices = jax.random.categorical(
             key_cat, jnp.log(self.dist_params["priors"]), shape=(num_samples,)
-        )  # Shape: (num_samples,)
+        )  # (num_samples,)
 
-        # Get means and covs for the chosen components
         chosen_means = self.dist_params["means"][
             component_indices
-        ]  # Shape: (num_samples, data_dim)
+        ]  # (num_samples, data_dim)
         chosen_covs = self.dist_params["covs"][
             component_indices
-        ]  # Shape: (num_samples, data_dim, data_dim)
+        ]  # (num_samples, data_dim, data_dim)
 
-        # Generate random keys for each sample
-        sample_keys = jax.random.split(key_norm, num_samples)  # Shape: (num_samples, 2)
+        sample_keys = jax.random.split(key_norm, num_samples)  # (num_samples, )
 
-        # Define a function to sample one point given mean, cov, and key
         def sample_one(mean: Array, cov: Array, single_key: Array) -> Array:
-            # multivariate_normal needs shape=() for a single sample
-            # Input shapes: (data_dim,), (data_dim, data_dim), (2,)
-            # Output shape: (data_dim,)
-            return jax.random.multivariate_normal(
-                single_key, mean, cov, shape=(), method="eigh"
+            data_dim = mean.shape[0]
+            noise = jax.random.multivariate_normal(
+                single_key, jnp.zeros_like(mean), jnp.eye(data_dim), shape=()
             )
+            return mean + _sqrt_psd(cov) @ noise
 
-        # Vectorize the sampling function over the batch dimension
-        # vmap signature: (Array[N, D], Array[N, D, D], Array[N, K]) -> Array[N, D]
-        vectorized_sampler = jax.vmap(sample_one)
-
-        # Sample all points
-        samples = vectorized_sampler(
+        samples = jax.vmap(sample_one)(
             chosen_means, chosen_covs, sample_keys
-        )  # Shape: (num_samples, data_dim)
+        )  # (num_samples, data_dim)
 
         return samples, component_indices
 
@@ -249,7 +240,7 @@ def gmm_x0(
 
     log_likelihoods_unnormalized = jax.vmap(
         lambda xbar_t, cov_t, cov_t_inv_xbar_t: -(1 / 2)
-        * (_logdeth(cov_t) + jnp.sum(xbar_t * cov_t_inv_xbar_t))
+        * (_logdet_psd(cov_t) + jnp.sum(xbar_t * cov_t_inv_xbar_t))
     )(xbars_t, covs_t, covs_t_inv_xbars_t)  # (num_components,)
 
     log_posterior_unnormalized = (

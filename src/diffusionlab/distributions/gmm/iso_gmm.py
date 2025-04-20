@@ -3,7 +3,6 @@ from typing import Tuple, cast
 from jax import numpy as jnp, Array
 import jax
 from diffusionlab.distributions.base import Distribution
-from diffusionlab.distributions.gmm.gmm import GMM
 from diffusionlab.distributions.gmm.utils import create_gmm_vector_field_fns
 from diffusionlab.dynamics import DiffusionProcess
 
@@ -66,12 +65,32 @@ class IsoGMM(Distribution):
         Returns:
             ``Tuple[Array[num_samples, data_dim], Array[num_samples]]``: A tuple ``(samples, component_indices)`` containing the drawn samples and the index of the GMM component from which each sample was drawn.
         """
-        data_dim = self.dist_params["means"].shape[1]
-        covs = jax.vmap(lambda variance: variance * jnp.eye(data_dim))(
-            self.dist_params["variances"]
-        )
-        base_gmm = GMM(self.dist_params["means"], covs, self.dist_params["priors"])
-        return base_gmm.sample(key, num_samples)
+        num_components, data_dim = self.dist_params["means"].shape
+        key, key_cat, key_norm = jax.random.split(key, 3)
+
+        component_indices = jax.random.categorical(
+            key_cat, jnp.log(self.dist_params["priors"]), shape=(num_samples,)
+        )  # (num_samples,)
+
+        chosen_means = self.dist_params["means"][
+            component_indices
+        ]  # (num_samples, data_dim)
+        chosen_vars = self.dist_params["variances"][component_indices]  # (num_samples,)
+
+        sample_keys = jax.random.split(key_norm, num_samples)  # (num_samples, )
+
+        def sample_one(mean: Array, var: Array, single_key: Array) -> Array:
+            data_dim = mean.shape[0]
+            noise = jax.random.multivariate_normal(
+                single_key, jnp.zeros_like(mean), jnp.eye(data_dim), shape=()
+            )
+            return mean + jnp.sqrt(var) * noise
+
+        samples = jax.vmap(sample_one)(
+            chosen_means, chosen_vars, sample_keys
+        )  # (num_samples, data_dim)
+
+        return samples, component_indices
 
     def score(self, x_t: Array, t: Array, diffusion_process: DiffusionProcess) -> Array:
         """
