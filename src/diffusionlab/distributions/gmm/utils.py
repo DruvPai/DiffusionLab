@@ -4,20 +4,40 @@ from diffusionlab.dynamics import DiffusionProcess
 from diffusionlab.vector_fields import VectorFieldType, convert_vector_field_type
 
 
-def _logdeth(cov: Array) -> Array:
+def _logdet_psd(A: Array) -> Array:
     """
     Computes the log determinant of a positive semi-definite (PSD) matrix.
 
     Uses ``eigh`` for numerical stability with symmetric matrices like covariance matrices.
 
     Args:
-        cov (``Array[dim, dim]``): The input PSD matrix (e.g., a covariance matrix).
+        A (``Array[dim, dim]``): The input PSD matrix (e.g., a covariance matrix).
 
     Returns:
         ``Array[]``: The log determinant of the matrix (scalar).
     """
-    eigvals = jnp.linalg.eigvalsh(cov)
+    eigvals = jnp.linalg.eigvalsh(A)
     return jnp.sum(jnp.log(eigvals))
+
+
+def _sqrt_psd(A: Array) -> Array:
+    """
+    Computes the square root of a positive semi-definite (PSD) matrix.
+
+    Uses ``eigh`` for numerical stability with symmetric matrices like covariance matrices.
+
+    Args:
+        A (``Array[dim, dim]``): The input PSD matrix (e.g., a covariance matrix).
+
+    Returns:
+        ``Array[dim, dim]``: The square root of the matrix.
+    """
+    eps = cast(float, jnp.finfo(A.dtype).eps)
+    eigvals, eigvecs = jnp.linalg.eigh(A)
+    sqrt_eigvals = jnp.sqrt(
+        cast(Array, jnp.where(eigvals > eps, eigvals, jnp.zeros_like(eigvals)))
+    )
+    return eigvecs @ jnp.diagflat(sqrt_eigvals) @ eigvecs.T
 
 
 def _lstsq(A: Array, y: Array) -> Array:

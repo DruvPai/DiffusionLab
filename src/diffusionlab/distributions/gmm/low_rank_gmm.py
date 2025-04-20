@@ -3,9 +3,8 @@ from dataclasses import dataclass
 from jax import numpy as jnp, Array
 import jax
 from diffusionlab.distributions.base import Distribution
-from diffusionlab.distributions.gmm.gmm import GMM
 from diffusionlab.distributions.gmm.utils import (
-    _logdeth,
+    _logdet_psd,
     _lstsq,
     create_gmm_vector_field_fns,
 )
@@ -69,12 +68,34 @@ class LowRankGMM(Distribution):
         Returns:
             ``Tuple[Array[num_samples, data_dim], Array[num_samples]]``: A tuple ``(samples, component_indices)`` containing the drawn samples and the index of the GMM component from which each sample was drawn.
         """
-        covs = jax.vmap(
-            lambda low_rank_cov_factor: low_rank_cov_factor @ low_rank_cov_factor.T
-        )(self.dist_params["cov_factors"])
-        return GMM(self.dist_params["means"], covs, self.dist_params["priors"]).sample(
-            key, num_samples
-        )
+        num_components, data_dim = self.dist_params["means"].shape
+        key, key_cat, key_norm = jax.random.split(key, 3)
+
+        component_indices = jax.random.categorical(
+            key_cat, jnp.log(self.dist_params["priors"]), shape=(num_samples,)
+        )  # (num_samples,)
+
+        chosen_means = self.dist_params["means"][
+            component_indices
+        ]  # (num_samples, data_dim)
+        chosen_cov_factors = self.dist_params["cov_factors"][
+            component_indices
+        ]  # (num_samples, data_dim, rank)
+
+        sample_keys = jax.random.split(key_norm, num_samples)  # (num_samples, )
+
+        def sample_one(mean: Array, cov_factor: Array, single_key: Array) -> Array:
+            data_dim, rank = cov_factor.shape
+            noise = jax.random.multivariate_normal(
+                single_key, jnp.zeros((rank,)), jnp.eye(rank), shape=()
+            )
+            return mean + cov_factor @ noise
+
+        samples = jax.vmap(sample_one)(
+            chosen_means, chosen_cov_factors, sample_keys
+        )  # (num_samples, data_dim)
+
+        return samples, component_indices
 
     def score(self, x_t: Array, t: Array, diffusion_process: DiffusionProcess) -> Array:
         """
@@ -223,7 +244,9 @@ def low_rank_gmm_x0(
     )(cov_factors, inner_covs, xbars_t)  # (num_components, data_dim)
 
     logdets_covs_t = jax.vmap(
-        lambda inner_cov: _logdeth((alpha_t / sigma_t) ** 2 * inner_cov + jnp.eye(rank))
+        lambda inner_cov: _logdet_psd(
+            (alpha_t / sigma_t) ** 2 * inner_cov + jnp.eye(rank)
+        )
     )(inner_covs) + 2 * data_dim * jnp.log(sigma_t)  # (num_components,)
 
     log_likelihoods_unnormalized = jax.vmap(

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Iterable, Tuple, cast
+from typing import Iterable, Tuple
 
 import jax
 from jax import Array, numpy as jnp
@@ -175,22 +175,47 @@ class EmpiricalDistribution(Distribution):
         alpha_t = diffusion_process.alpha(t)
         sigma_t = diffusion_process.sigma(t)
 
-        softmax_denom = jnp.zeros_like(t)
-        x0_hat = jnp.zeros_like(x_t)
-        for X_batch, y_batch in data:
+        # Initialize for stable online softmax
+        max_exponent = -jnp.inf
+        weighted_sum_x0 = jnp.zeros_like(x_t)
+        sum_weights = jnp.zeros(())
+
+        for X_batch, _ in data:  # y_batch is unused
             squared_dists = jax.vmap(lambda x: jnp.sum((x_t - alpha_t * x) ** 2))(
                 X_batch
             )
-            exp_negative_dists = jnp.exp(-squared_dists / (2 * sigma_t**2))
-            softmax_denom += jnp.sum(exp_negative_dists)
-            x0_hat += jnp.sum(
-                jax.vmap(lambda xi, ei: xi * ei)(X_batch, exp_negative_dists),
-                axis=0,
+            exponents = -squared_dists / (2 * sigma_t**2)
+
+            # Rebalance by max exponent
+            current_max_exponent = jnp.max(exponents)
+            new_max_exponent = jnp.maximum(max_exponent, current_max_exponent)
+
+            # Rescale previous sums if max exponent increased
+            rescale_factor = jnp.exp(max_exponent - new_max_exponent)
+            sum_weights = sum_weights * rescale_factor
+            weighted_sum_x0 = weighted_sum_x0 * rescale_factor  # (*data_dims)
+
+            # Calculate current batch weights scaled by new max exponent
+            current_weights = jnp.exp(exponents - new_max_exponent)  # (batch_size, )
+
+            # Update sums
+            sum_weights = sum_weights + jnp.sum(current_weights)  # (, )
+            weighted_sum_x0 = weighted_sum_x0 + jnp.sum(
+                jax.vmap(lambda xi, wi: xi * wi)(
+                    X_batch, current_weights
+                ),  # (batch_size, *data_dims)
+                axis=0,  # Sum over batch dim -> (*data_dims)
             )
 
-        eps = cast(float, jnp.finfo(softmax_denom.dtype).eps)
-        softmax_denom = jnp.maximum(softmax_denom, eps)
-        x0_hat = x0_hat / softmax_denom
+            # Update overall max exponent
+            max_exponent = new_max_exponent
+
+        # Final calculation with division-by-zero protection
+        x0_hat = jnp.where(
+            sum_weights == 0,
+            jnp.zeros_like(weighted_sum_x0),
+            weighted_sum_x0 / sum_weights,
+        )
         return x0_hat
 
     def eps(

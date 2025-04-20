@@ -5,6 +5,7 @@ from jax import Array
 from typing import Iterable, Tuple
 
 from diffusionlab.distributions.empirical import EmpiricalDistribution
+from diffusionlab.distributions.gmm.iso_hom_gmm import IsoHomGMM
 from diffusionlab.dynamics import FlowMatchingProcess
 
 
@@ -398,3 +399,78 @@ class TestEmpiricalDistribution:
         assert score.shape == data_shape  # Explicit check
         assert eps.shape == data_shape  # Explicit check
         assert v.shape == data_shape  # Explicit check
+
+    # --- Comparison Tests with Zero-Variance GMM ---
+    @pytest.mark.parametrize(
+        "test_id, data, x_t, t_val",
+        [
+            (
+                "1d_simple",
+                [(jnp.array([[0.0], [10.0]]), None)],  # Data points 0 and 10
+                jnp.array([1.0]),  # Test point
+                0.5,
+            ),
+            (
+                "1d_closer_t0",
+                [(jnp.array([[0.0], [10.0]]), None)],
+                jnp.array([0.1]),  # Closer to one of the means
+                0.1,  # Smaller t
+            ),
+            (
+                "2d_simple",
+                [
+                    (jnp.array([[1.0, 1.0], [2.0, 2.0]]), None),
+                    (jnp.array([[3.0, 3.0]]), None),
+                ],
+                jnp.array([1.5, 1.5]),  # Test point
+                0.8,  # Larger t
+            ),
+            (
+                "2d_further",
+                [
+                    (jnp.array([[1.0, 1.0], [-1.0, -1.0]]), None),
+                ],
+                jnp.array([5.0, -5.0]),  # Further test point
+                0.5,
+            ),
+        ],
+    )
+    def test_vector_field_comparison_with_gmm(self, test_id, data, x_t, t_val):
+        """Compare vector fields with an equivalent zero-variance GMM."""
+        # Consolidate data for GMM
+        all_data_points = jnp.concatenate([d[0] for d in data], axis=0)
+        priors = (
+            jnp.ones(all_data_points.shape[0]) / all_data_points.shape[0]
+        )  # Assume uniform priors for GMM
+
+        # Initialize distributions
+        emp_dist = EmpiricalDistribution(data)
+        # Use a very small variance for numerical stability
+        gmm_dist = IsoHomGMM(
+            means=all_data_points, variance=jnp.array(1e-9), priors=priors
+        )
+
+        # Initialize process
+        process = FlowMatchingProcess()
+        t = jnp.array(t_val)
+
+        # Calculate vector fields for EmpiricalDistribution
+        emp_x0 = emp_dist.x0(x_t, t, process)
+        emp_score = emp_dist.score(x_t, t, process)
+        emp_eps = emp_dist.eps(x_t, t, process)
+        emp_v = emp_dist.v(x_t, t, process)
+
+        # Calculate vector fields for IsotropicHomoscedasticGMM
+        gmm_x0 = gmm_dist.x0(x_t, t, process)
+        gmm_score = gmm_dist.score(x_t, t, process)
+        gmm_eps = gmm_dist.eps(x_t, t, process)
+        gmm_v = gmm_dist.v(x_t, t, process)
+
+        # Compare results (using a reasonable tolerance)
+        atol = 1e-5
+        assert jnp.allclose(emp_x0, gmm_x0, atol=atol), f"x0 mismatch in {test_id}"
+        assert jnp.allclose(emp_score, gmm_score, atol=atol), (
+            f"score mismatch in {test_id}"
+        )
+        assert jnp.allclose(emp_eps, gmm_eps, atol=atol), f"eps mismatch in {test_id}"
+        assert jnp.allclose(emp_v, gmm_v, atol=atol), f"v mismatch in {test_id}"
