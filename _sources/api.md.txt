@@ -1,0 +1,110 @@
+# API Reference
+
+<!-- This page contains the automatically generated API reference documentation. -->
+
+
+## `diffusionlab`
+```{eval-rst}
+.. automodule:: diffusionlab
+   :members:
+   :show-inheritance:
+```
+
+## `diffusionlab.distributions`
+```{eval-rst}
+.. automodule:: diffusionlab.distributions
+   :members:
+   :show-inheritance:
+```
+
+#### `diffusionlab.distributions.base`
+```{eval-rst}
+.. automodule:: diffusionlab.distributions.base
+   :members:
+   :show-inheritance:
+```
+
+#### `diffusionlab.distributions.empirical`
+```{eval-rst}
+.. automodule:: diffusionlab.distributions.empirical
+   :members:
+   :show-inheritance:
+```
+
+#### `diffusionlab.distributions.gmm`
+```{eval-rst}
+.. automodule:: diffusionlab.distributions.gmm
+   :members:
+   :show-inheritance:
+```
+
+##### `diffusionlab.distributions.gmm.gmm`
+```{eval-rst}
+.. automodule:: diffusionlab.distributions.gmm.gmm
+   :members:
+   :show-inheritance:
+```
+
+##### `diffusionlab.distributions.gmm.iso_gmm`
+```{eval-rst}
+.. automodule:: diffusionlab.distributions.gmm.iso_gmm
+   :members:
+   :show-inheritance:
+```
+
+##### `diffusionlab.distributions.gmm.iso_hom_gmm`
+```{eval-rst}
+.. automodule:: diffusionlab.distributions.gmm.iso_hom_gmm
+   :members:
+   :show-inheritance:
+```
+
+##### `diffusionlab.distributions.gmm.low_rank_gmm`
+```{eval-rst}
+.. automodule:: diffusionlab.distributions.gmm.low_rank_gmm
+   :members:
+   :show-inheritance:
+```
+
+##### `diffusionlab.distributions.gmm.utils`
+```{eval-rst}
+.. automodule:: diffusionlab.distributions.gmm.utils
+   :members:
+   :show-inheritance:
+```
+
+## `diffusionlab.dynamics`
+```{eval-rst}
+.. automodule:: diffusionlab.dynamics
+   :members:
+   :show-inheritance:
+```
+
+## `diffusionlab.losses`
+```{eval-rst}
+.. automodule:: diffusionlab.losses
+   :members:
+   :show-inheritance:
+```
+
+## `diffusionlab.samplers`
+```{eval-rst}
+.. automodule:: diffusionlab.samplers
+   :members:
+   :show-inheritance:
+```
+
+## `diffusionlab.schedulers`
+```{eval-rst}
+.. automodule:: diffusionlab.schedulers
+   :members:
+   :show-inheritance:
+```
+
+## `diffusionlab.vector_fields`
+```{eval-rst}
+.. automodule:: diffusionlab.vector_fields
+   :members:
+   :show-inheritance:
+```
+
