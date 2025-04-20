@@ -92,6 +92,51 @@ class TestEmpiricalDistribution:
                 (),
                 True,
             ),
+            # --- Tests with arbitrary shapes ---
+            (
+                "unlabeled_5d_vector",
+                [
+                    (jnp.arange(10).reshape(2, 5), None),  # Batch 1
+                    (jnp.ones((3, 5)), None),  # Batch 2
+                ],
+                4,  # Request 4 samples
+                (5,),  # Expected shape is (5,)
+                None,
+                False,
+            ),
+            (
+                "labeled_5d_vector",
+                [
+                    (jnp.arange(10).reshape(2, 5), jnp.array([0, 1])),  # Batch 1
+                    (jnp.ones((3, 5)), jnp.array([0, 1, 0])),  # Batch 2
+                ],
+                4,  # Request 4 samples
+                (5,),  # Expected shape is (5,)
+                (),  # Expected label shape
+                True,
+            ),
+            (
+                "unlabeled_arbitrary_shape_4x4",
+                [
+                    (jnp.zeros((2, 4, 4)), None),
+                    (jnp.ones((1, 4, 4)), None),
+                ],
+                2,  # Request 2 samples
+                (4, 4),  # Expected shape
+                None,
+                False,
+            ),
+            (
+                "labeled_arbitrary_shape_3x5x2",
+                [
+                    (jnp.zeros((2, 3, 5, 2)), jnp.array([0, 1])),  # Batch 1
+                    (jnp.ones((1, 3, 5, 2)), jnp.array([0])),  # Batch 2
+                ],
+                2,  # Request 2 samples
+                (3, 5, 2),  # Expected shape
+                (),  # Expected label shape
+                True,
+            ),
         ],
     )
     def test_sample_shapes(
@@ -253,6 +298,34 @@ class TestEmpiricalDistribution:
                     (jnp.zeros((1, 2, 3, 1)), None),
                 ],
                 (2, 3, 1),
+                0.5,
+            ),
+            # --- Tests with arbitrary shapes ---
+            (
+                "5d_vector",
+                [
+                    (jnp.arange(10).reshape(2, 5), None),
+                    (jnp.ones((3, 5)), None),
+                ],
+                (5,),  # x_t_shape
+                0.5,
+            ),
+            (
+                "arbitrary_shape_4x4",
+                [
+                    (jnp.zeros((2, 4, 4)), None),
+                    (jnp.ones((1, 4, 4)), None),
+                ],
+                (4, 4),  # x_t_shape
+                0.5,
+            ),
+            (
+                "arbitrary_shape_3x5x2",
+                [
+                    (jnp.zeros((2, 3, 5, 2)), None),
+                    (jnp.ones((1, 3, 5, 2)), None),
+                ],
+                (3, 5, 2),  # x_t_shape
                 0.5,
             ),
         ],
@@ -432,6 +505,45 @@ class TestEmpiricalDistribution:
                 ],
                 jnp.array([5.0, -5.0]),  # Further test point
                 0.5,
+            ),
+            # --- Tests with multi-batch empirical data ---
+            (
+                "1d_multi_batch",
+                [
+                    (jnp.array([[0.0]]), None),  # Batch 1
+                    (jnp.array([[10.0]]), None),  # Batch 2
+                ],
+                jnp.array([1.0]),  # Test point
+                0.5,
+            ),
+            (
+                "2d_multi_batch",
+                [
+                    (jnp.array([[1.0, 1.0], [2.0, 2.0]]), None),  # Batch 1
+                    (jnp.array([[3.0, 3.0]]), None),  # Batch 2
+                ],
+                jnp.array([1.5, 1.5]),  # Test point
+                0.8,
+            ),
+            (
+                "2d_multi_batch_many",
+                [
+                    (jnp.array([[1.0, 1.0]]), None),  # Batch 1
+                    (jnp.array([[-1.0, -1.0]]), None),  # Batch 2
+                    (jnp.array([[5.0, 5.0], [0.0, 0.0]]), None),  # Batch 3
+                ],
+                jnp.array([0.5, 0.5]),  # Test point
+                0.2,
+            ),
+            # --- Tests with arbitrary shapes ---
+            (
+                "5d_vector_comparison",
+                [
+                    (jnp.arange(10).reshape(2, 5), None),  # Batch 1
+                    (jnp.ones((3, 5)), None),  # Batch 2
+                ],
+                jnp.array([0.1, 0.2, 0.3, 0.4, 0.5]),  # Test point
+                0.6,  # t_val
             ),
         ],
     )
