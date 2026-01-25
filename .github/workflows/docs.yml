@@ -2,9 +2,9 @@ name: Docs
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   docs:
@@ -14,37 +14,28 @@ jobs:
       contents: write
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install uv
-      uses: astral-sh/setup-uv@v5
-        
-    - name: Install Python
-      run: uv python install
-        
-    - name: Install the project
-      run: uv sync --all-extras
+      - uses: actions/checkout@v4
 
-    - name: Configure Git Credentials
-      run: |
-        git config user.name github-actions[bot]
-        git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
-    - name: Generate docs files
-      run: |
-        cd docs
-        uv run generate_docs.py
-        uv run make html
-        mv llms.txt _build/html/
-        cd ..
+      - name: Install Python
+        run: uv python install
 
-    - name: Deploy docs to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v4
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./docs/_build/html
-        publish_branch: gh-pages
-        force_orphan: true
-        user_name: 'github-actions[bot]'
-        user_email: '41898282+github-actions[bot]@users.noreply.github.com'
-        commit_message: 'Deploy documentation'
+      - name: Install the project
+        run: uv sync
+
+      - name: Generate llms.txt files
+        run: uv run python docs/generate_docs.py
+
+      - name: Deploy docs to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          publish_branch: gh-pages
+          force_orphan: true
+          user_name: "github-actions[bot]"
+          user_email: "41898282+github-actions[bot]@users.noreply.github.com"
+          commit_message: "Deploy documentation"

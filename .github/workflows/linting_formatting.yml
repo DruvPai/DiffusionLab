@@ -2,28 +2,28 @@ name: Ruff
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install uv
-      uses: astral-sh/setup-uv@v5
-        
-    - name: Install Python
-      run: uv python install
-        
-    - name: Install the project
-      run: uv sync --all-extras --dev
+      - uses: actions/checkout@v4
 
-    - name: Run Ruff linter
-      run: uv run ruff check --output-format=github .
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
 
-    - name: Run Ruff formatter
-      run: uv run ruff format .
+      - name: Install Python
+        run: uv python install
+
+      - name: Install the project
+        run: uv sync --all-extras --dev
+
+      - name: Run Ruff linter
+        run: uv run ruff check --output-format=github .
+
+      - name: Run Ruff formatter
+        run: uv run ruff format .

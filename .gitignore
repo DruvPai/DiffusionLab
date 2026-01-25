@@ -9,11 +9,12 @@ wheels/
 # Virtual environments
 .venv
 
+# uv 
+uv.lock
+
 # Ruff
 .ruff_cache
 
-# Sphinx
-docs/_build/
-docs/index.md
-docs/api.md
-docs/llms.txt
+# Generated docs
+docs/llms.md
+docs/llms-full.md

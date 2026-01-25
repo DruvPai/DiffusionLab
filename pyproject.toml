@@ -4,31 +4,36 @@ build-backend = "hatchling.build"
 
 [project]
 name = "diffusionlab"
-version = "3.0.4"
-description = "Easy no-frills implementations of common abstractions for diffusion models."
+version = "4.0.0"
+description = "No-frills Jax implementations of common abstractions for diffusion models."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
-    "jax>=0.6.0",
-]
-
-[project.optional-dependencies]
-docs = [
-    "furo>=2024.8.6",
-    "myst-parser>=4.0.1",
-    "sphinx>=8.2.3",
-]
-dev = [
-    "matplotlib>=3.10.1",
-    "pytest>=8.3.5",
-    "pytest-cov>=6.0.0",
-    "ruff>=0.11.0",
+    "einops>=0.8.2",
+    "equinox>=0.13.2",
+    "jax>=0.8.0",
+    "jaxtyping>=0.3.3",
+    "optax>=0.2.6",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/diffusionlab"]
+packages = ["diffusionlab"]
 
 [tool.ruff.lint]
 ignore = [
-    "E731",  # This is the rule which prevents use of lambda expressions
+    "E731", # This is the rule which prevents use of lambda expressions
+    "F722", # This is a rule which has a known bug with JaxTyping and is irrelevant otherwise
+    "F821", # Ruff false-positives on jaxtyping shape strings (e.g. "batch *spatial")
+]
+
+[tool.ty.rules]
+invalid-syntax-in-forward-annotation = "ignore"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.14",
+    "ty>=0.0.14",
+    "matplotlib>=3.10.8",
+    "pytest",
+    "scikit-learn>=1.8.0",
 ]

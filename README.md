@@ -1,98 +1,212 @@
+# DiffusionLab
 
-<div style="text-align:center;">
+<div align="center">
 
-![DiffusionLab Logo](https://raw.githubusercontent.com/DruvPai/DiffusionLab/refs/heads/main/docs/diffusionlab_logo.svg)
+![DiffusionLab Logo](https://druvpai.github.io/DiffusionLab/diffusionlab_logo.svg)
 
-[Documentation](https://druvpai.github.io/DiffusionLab) • `pip install diffusionlab` • [`llms.txt`](https://raw.githubusercontent.com/DruvPai/DiffusionLab/refs/heads/gh-pages/llms.txt)
+`pip install diffusionlab` • [`llms.txt`](https://druvpai.github.io/DiffusionLab/llms-full.md)
 
-![Tests](https://github.com/druvpai/diffusionlab/actions/workflows/testing.yml/badge.svg) • ![Linting and Formatting](https://github.com/druvpai/diffusionlab/actions/workflows/linting_formatting.yml/badge.svg)
+[![PyPI version](https://img.shields.io/pypi/v/diffusionlab)](https://pypi.org/project/diffusionlab/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/downloads/)
 
 </div>
 
-## What is DiffusionLab?
+A no-frills JAX library providing core abstractions for diffusion models. DiffusionLab focuses on corruption/forward processes for continuous, discrete, and simplicial (soft-categorical) data, designed to be easy to understand, modify, and extend for research.
 
-TL;DR: DiffusionLab is a laboratory for quickly and easily experimenting with diffusion models.
-- DiffusionLab IS:
-  - A lightweight and flexible set of JAX APIs for smaller-scale diffusion model training and sampling.
-  - An implementation of the mathematical foundations of diffusion models. 
-- DiffusionLab IS NOT:
-  - A replacement for HuggingFace Diffusers. 
-  - A codebase for SoTA diffusion model training or inference. 
+The API is **PyTree-first**: data, times, and predictions can be arbitrarily nested (e.g. multimodal dicts), and everything composes naturally with JAX transformations.
 
-## Example
+## Features
 
-The following code compares three sample sets:
-- One drawn from the ground truth distribution, which is a Gaussian mixture model;
-- One sampled using DDIM with the ground-truth denoiser for the Gaussian mixture model;
-- One sampled using DDIM with the ground-truth denoiser for the _empirical_ distribution of the first sample set.
+- **Corruption processes** for continuous (Gaussian), discrete (absorbing/uniform), and simplicial (Dirichlet) data
+- **Reverse-process samplers** including Euler, DDM, and discrete ancestral sampling
+- **Training losses** with configurable SNR weighting and time-sampling schedules
+- **Reference model architectures**: MLP and DiT (Diffusion Transformer)
+- **Classifier-free guidance** out of the box
+- **Multimodal support**: jointly corrupt and denoise mixed continuous/discrete data with a single model
+
+## Installation
+
+Install from PyPI:
+
+```bash
+pip install diffusionlab
+```
+
+Or with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv add diffusionlab
+```
+
+### From source
+
+```bash
+git clone https://github.com/druvpai/DiffusionLab.git
+cd DiffusionLab
+uv sync
+```
+
+## Quick start
+
+Set up and sample from a flow-matching model on 2D data in ~30 lines:
 
 ```python
-import jax 
-from jax import numpy as jnp, vmap
-from diffusionlab.dynamics import VariancePreservingProcess
-from diffusionlab.schedulers import UniformScheduler
-from diffusionlab.samplers import DDMSampler
-from diffusionlab.distributions.gmm.gmm import GMM
-from diffusionlab.distributions.empirical import EmpiricalDistribution
-from diffusionlab.vector_fields import VectorFieldType 
+import jax
+import jax.numpy as jnp
+from diffusionlab.processes.gaussian import FlowMatching
+from diffusionlab.models.mlp import DiffusionMLP
+from diffusionlab.sampling.continuous import EulerSampler
+from diffusionlab.sampling.base import sample
+from diffusionlab.sampling.schedules import uniform_schedule
+from diffusionlab.training.denoising import DenoisingLoss
+from diffusionlab.training.schedules import uniform_time_with_eps
 
+# Define process and model
+process = FlowMatching(data_shape=(2,))
+model = DiffusionMLP(
+    data_dim=2, hidden_dim=128, num_layers=4,
+    time_emb_dim=64, cond_dim=64, prediction_kind="v_t",
+    key=jax.random.key(0),
+)
+
+# Compute loss on a batch
+loss_obj = DenoisingLoss(process=process)
 key = jax.random.key(1)
+key_t, key_fwd = jax.random.split(key)
+t = uniform_time_with_eps(key_t, batch=256)
+x_t, aux = process.forward(key_fwd, x_0, t)
+out = loss_obj(predictor=model, x_0=x_0, x_t=x_t, t=t, aux=aux, cond=None)
 
-dim = 10
-num_samples_ground_truth = 100
-num_samples_ddim = 50
-
-num_components = 3
-priors = jnp.ones(num_components) / num_components
-key, subkey = jax.random.split(key)
-means = jax.random.normal(subkey, (num_components, dim))
-key, subkey = jax.random.split(key)
-cov_factors = jax.random.normal(subkey, (num_components, dim, dim))
-covs = jax.vmap(lambda A: A @ A.T)(cov_factors)
-
-gmm = GMM(means, covs, priors)
-
-key, subkey = jax.random.split(key)
-X_ground_truth, y_ground_truth = gmm.sample(key, num_samples_ground_truth)
-
-num_steps = 100
-t_min = 0.001 
-t_max = 0.999
-
-diffusion_process = VariancePreservingProcess()
-scheduler = UniformScheduler()
-ts = scheduler.get_ts(t_min=t_min, t_max=t_max, num_steps=num_steps)
-
-key, subkey = jax.random.split(key)
-X_noise = jax.random.normal(subkey, (num_samples_ddim, dim))
-
-zs = jax.random.normal(key, (num_samples_ddim, num_steps, dim))
-
-ground_truth_sampler = DDMSampler(diffusion_process, lambda x, t: gmm.x0(x, t, diffusion_process), VectorFieldType.X0, use_stochastic_sampler=False)
-X_ddim_ground_truth = jax.vmap(lambda x_init, z: ground_truth_sampler.sample(x_init, z, ts))(X_noise, zs)
-
-empirical_distribution = EmpiricalDistribution([(X_ground_truth, y_ground_truth)])
-empirical_sampler = DDMSampler(diffusion_process, lambda x, t: empirical_distribution.x0(x, t, diffusion_process), VectorFieldType.X0, use_stochastic_sampler=False)
-X_ddim_empirical = jax.vmap(lambda x_init, z: empirical_sampler.sample(x_init, z, ts))(X_noise, zs)
-
-min_distance_to_gt_empirical = vmap(lambda x: jnp.min(vmap(lambda x_gt: jnp.linalg.norm(x - x_gt))(X_ground_truth)))(X_ddim_empirical)
-min_distance_to_gt_ground_truth = vmap(lambda x: jnp.min(vmap(lambda x_gt: jnp.linalg.norm(x - x_gt))(X_ground_truth)))(X_ddim_ground_truth)
-
-print(f"Min distance to ground truth samples from DDIM samples using empirical denoiser: {min_distance_to_gt_empirical}")
-print(f"Min distance to ground truth samples from DDIM samples using ground truth denoiser: {min_distance_to_gt_ground_truth}")
+# Sample from the trained model
+sampler = EulerSampler(process=process)
+schedule = uniform_schedule(num_steps=100, batch_size=512)
+samples = sample(key=jax.random.key(2), sampler=sampler, predictor=model,
+                 batch_size=512, time_schedule=schedule)
 ```
 
-## Note on Frameworks
+## Examples
 
-DiffusionLab versions < 3.0 use a PyTorch backbone. Here is a permalink to the [GitHub pages](https://github.com/DruvPai/DiffusionLab/tree/1543db3453c4cc687c724eb0e01f63c109e4465a) and [llms.txt](https://raw.githubusercontent.com/DruvPai/DiffusionLab/1543db3453c4cc687c724eb0e01f63c109e4465a/llms.txt) for the old version.
+The `examples/` directory contains complete, runnable scripts:
 
-DiffusionLab versions >= 3.0 use a JAX backbone.
+| Example                                               | Description                                                             |
+| ----------------------------------------------------- | ----------------------------------------------------------------------- |
+| [`two_moons.py`](examples/two_moons.py)               | Flow matching on 2D synthetic data with trajectory visualization        |
+| [`mnist_dit.py`](examples/mnist_dit.py)               | Class-conditional DiT on MNIST with classifier-free guidance            |
+| [`mnist_multimodal.py`](examples/mnist_multimodal.py) | Joint image + label generation with mixed continuous/discrete diffusion |
 
+Run any example with:
 
-## Citation Information
-
-You can use the following Bibtex:
+```bash
+uv run python examples/two_moons.py
+uv run python examples/mnist_dit.py
+uv run python examples/mnist_multimodal.py
 ```
+
+The MNIST examples download data automatically on first run.
+
+## Project structure
+
+```
+diffusionlab/
+├── processes/              # Forward corruption processes
+│   ├── base.py             #   CorruptionProcess, MultimodalCorruptionProcess
+│   ├── interpolation.py    #   InterpolationProcess (abstract)
+│   ├── gaussian.py         #   VPCosine, VPLinear, VE, EDM, FlowMatching
+│   ├── discrete.py         #   MaskLinear, MaskCosine, UniformLinear, UniformCosine
+│   └── simplicial.py       #   SimplicialLinear, SimplicialCosine
+├── sampling/               # Reverse-process samplers
+│   ├── base.py             #   Sampler, MultimodalSampler, sample, sample_trajectory
+│   ├── continuous.py       #   EulerSampler, DDMSampler
+│   ├── discrete.py         #   DiscreteAncestralSampler
+│   ├── guidance.py         #   CFG (classifier-free guidance)
+│   └── schedules.py        #   uniform_schedule, edm_schedule
+├── training/               # Training losses and utilities
+│   ├── base.py             #   Loss, MultimodalLoss, mse_loss, ce_loss, kl_loss
+│   ├── denoising.py        #   DenoisingLoss
+│   ├── distillation.py     #   DistillationLoss
+│   ├── consistency.py      #   ConsistencyLoss
+│   ├── weighting.py        #   SNR-based weight functions
+│   └── schedules.py        #   Time sampling strategies
+├── models/                 # Reference neural network architectures
+│   ├── base.py             #   DiffusionModel (abstract)
+│   ├── components.py       #   SinusoidalEmbedding, FiLM, AdaLNZero
+│   ├── mlp.py              #   DiffusionMLP, ConditionedDiffusionMLP
+│   └── dit.py              #   DiT, ConditionedDiT
+├── typing.py               # Prediction dataclass, type aliases
+└── utils/
+    └── tree_ops.py         # PyTree utilities (bcast_right, tree_map_with_key)
+```
+
+## Development
+
+### Prerequisites
+
+- Python >= 3.13
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+
+### Setup
+
+```bash
+git clone https://github.com/druvpai/DiffusionLab.git
+cd DiffusionLab
+uv sync
+```
+
+### Running tests
+
+```bash
+# Run the full test suite
+uv run pytest tests/
+
+# Run a specific test file
+uv run pytest tests/processes/test_gaussian.py
+
+# Run tests matching a pattern
+uv run pytest tests/ -k "test_forward"
+```
+
+### Linting and formatting
+
+```bash
+uv run ruff format diffusionlab/ tests/
+uv run ruff check diffusionlab/ tests/
+```
+
+### Type checking
+
+```bash
+uv run ty check diffusionlab/
+```
+
+## Contributing
+
+Contributions are welcome! Here's how to get started:
+
+1. **Fork** the repository and clone your fork
+2. **Create a branch** for your feature or fix:
+   ```bash
+   git checkout -b my-feature
+   ```
+3. **Install** development dependencies:
+   ```bash
+   uv sync
+   ```
+4. **Make your changes** — keep them focused and minimal
+5. **Add tests** for any new functionality in `tests/`
+6. **Run the checks** before submitting:
+   ```bash
+   uv run ruff format diffusionlab/ tests/
+   uv run ruff check diffusionlab/ tests/
+   uv run pytest tests/
+   ```
+7. **Open a pull request** with a clear description of your changes
+
+## Citation
+
+If you use DiffusionLab in your research, please consider citing it:
+
+```bibtex
 @Misc{pai25diffusionlab,
     author = {Pai, Druv},
     title = {DiffusionLab},
@@ -100,4 +214,9 @@ You can use the following Bibtex:
     year = {2025}
 }
 ```
+
 Many thanks!
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
