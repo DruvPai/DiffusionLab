@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 585.29 128.8">
+  <defs>
+    <style>
+      .cls-1 {
+        font-family: Avenir-Heavy, Avenir;
+        font-size: 100px;
+        font-weight: 800;
+      }
+
+      .cls-2 {
+        letter-spacing: 0em;
+      }
+
+      .cls-2, .cls-3, .cls-4 {
+        fill: #27aae1;
+      }
+
+      .cls-3 {
+        letter-spacing: -.02em;
+      }
+
+      .cls-5 {
+        fill: #1c75bc;
+        letter-spacing: 0em;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer_1">
+    <text class="cls-1" transform="translate(0 85.4)"><tspan class="cls-4" x="0" y="0">Di</tspan><tspan class="cls-3" x="101.9" y="0">f</tspan><tspan class="cls-2" x="135.3" y="0">fusion</tspan><tspan class="cls-5" x="416.69" y="0">Lab</tspan></text>
+  </g>
+</svg>
