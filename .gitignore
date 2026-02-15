@@ -16,5 +16,5 @@ uv.lock
 .ruff_cache
 
 # Generated docs
-docs/llms.md
-docs/llms-full.md
+docs/*.md
+docs/*.txt

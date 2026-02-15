@@ -220,3 +220,7 @@ Many thanks!
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
+## Acknowledgements
+
+This package was greatly inspired by [Hackable Diffusion](https://github.com/google/hackable_diffusion), but the implementations and some core primitives are very different, leading to greater flexibility and extensibility (IMO).

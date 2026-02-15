@@ -34,6 +34,7 @@ dev = [
     "ruff>=0.14.14",
     "ty>=0.0.14",
     "matplotlib>=3.10.8",
-    "pytest",
     "scikit-learn>=1.8.0",
+    "pytest-cov>=7.0.0",
+    "pytest>=9.0.2",
 ]
